@@ -3,7 +3,7 @@ from typing import Callable
 
 import numpy as np
 from PyQt5.QtCore import QSize, Qt, QPoint
-from PyQt5.QtGui import QPainter, QPaintEvent, QPen, QMouseEvent
+from PyQt5.QtGui import QPainter, QPaintEvent, QPen, QMouseEvent, QWheelEvent
 from PyQt5.QtWidgets import QApplication, QWidget, QFrame
 
 
@@ -24,6 +24,8 @@ class GraphicWidget(QFrame):
         self.setStyleSheet('background-color: grey;')
         self.__points: np.ndarray = np.empty((0, 2))
         self.__center = QPoint(0, 0)
+        self.__scale = 1.0
+        self.__delta_coef = 0.03
         self.__drag_start_point = None
         self.__drag_center_snapshot = None
 
@@ -32,8 +34,8 @@ class GraphicWidget(QFrame):
         painter.setPen(pen)
 
         for index in range(len(self.__points) - 1):
-            start_point = self.__points[index]
-            end_point = self.__points[index + 1]
+            start_point = self.__points[index] * self.__scale
+            end_point = self.__points[index + 1] * self.__scale
             painter.drawLine(
                 int(start_point[0]), int(start_point[1]),
                 int(end_point[0]), int(end_point[1]),
@@ -68,6 +70,11 @@ class GraphicWidget(QFrame):
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
         self.__drag_start_point = None
         self.__drag_center_snapshot = None
+
+    def wheelEvent(self, event: QWheelEvent) -> None:
+        direction = [-1, 1][event.angleDelta().y() >= 0]
+        self.__scale *= 1 + direction * self.__delta_coef
+        self.repaint()
 
 
 class MainWindow(QWidget):
