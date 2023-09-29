@@ -1,7 +1,7 @@
-from typing import Callable
-import numpy as np
 import sys
+from typing import Callable
 
+import numpy as np
 from PyQt5.QtCore import QSize, Qt, QPoint
 from PyQt5.QtGui import QPainter, QPaintEvent, QPen, QMouseEvent
 from PyQt5.QtWidgets import QApplication, QWidget, QFrame
@@ -23,6 +23,9 @@ class GraphicWidget(QFrame):
         super().__init__(parent)
         self.setStyleSheet('background-color: grey;')
         self.__points: np.ndarray = np.empty((0, 2))
+        self.__center = QPoint(0, 0)
+        self.__drag_start_point = None
+        self.__drag_center_snapshot = None
 
     def __draw_points(self, painter: QPainter) -> None:
         pen = QPen(Qt.black, 4, Qt.SolidLine)
@@ -47,8 +50,25 @@ class GraphicWidget(QFrame):
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = self.__get_painter()
         painter.begin(self)
+        painter.translate(self.__center)
         self.__draw_points(painter)
         painter.end()
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        if event.button() == Qt.LeftButton:
+            self.__drag_start_point = QPoint(event.x(), event.y())
+            self.__drag_center_snapshot = self.__center
+
+    def mouseMoveEvent(self, event: QMouseEvent) -> None:
+        if self.__drag_start_point is not None:
+            delta = event.pos() - self.__drag_start_point
+            self.__center = self.__drag_center_snapshot + delta
+            self.repaint()
+
+    def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        self.__drag_start_point = None
+        self.__drag_center_snapshot = None
+
 
 class MainWindow(QWidget):
     def __init__(self):
