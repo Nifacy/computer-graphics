@@ -2,7 +2,7 @@ import sys
 from typing import Callable
 
 import numpy as np
-from PyQt5.QtCore import QSize, Qt, QPoint
+from PyQt5.QtCore import QSize, Qt, QPoint, QTimer
 from PyQt5.QtGui import QPainter, QPaintEvent, QPen, QMouseEvent, QWheelEvent
 from PyQt5.QtWidgets import QApplication, QWidget, QFrame
 
@@ -19,15 +19,24 @@ def points_calculator(a: float) -> Callable[[np.arange], np.ndarray]:
 
 
 class GraphicWidget(QFrame):
-    def __init__(self, parent: QWidget | None):
+    def __init__(self, parent: QWidget | None, calculate_points: Callable[[np.arange], np.ndarray]):
         super().__init__(parent)
-        self.setStyleSheet('background-color: grey;')
         self.__points: np.ndarray = np.empty((0, 2))
-        self.__center = QPoint(0, 0)
+        self.__default_step = 0.2
         self.__scale = 1.0
+        self.__calculate_points = calculate_points
+        self.__center = QPoint(0, 0)
         self.__delta_coef = 0.03
+
         self.__drag_start_point = None
         self.__drag_center_snapshot = None
+        self.setStyleSheet('background-color: grey;')
+
+        self.__wheel_scroll_end_timer = QTimer()
+        self.__wheel_scroll_end_timer.setSingleShot(True)
+        self.__wheel_scroll_end_timer.timeout.connect(self.__on_wheel_scroll_end)
+
+        self.__update_points()
 
     def __draw_points(self, painter: QPainter) -> None:
         pen = QPen(Qt.black, 4, Qt.SolidLine)
@@ -46,8 +55,10 @@ class GraphicWidget(QFrame):
         painter.setRenderHint(QPainter.Antialiasing)
         return painter
 
-    def draw_points(self, points: np.ndarray) -> None:
-        self.__points = points
+    def __update_points(self) -> None:
+        step = self.__default_step / self.__scale
+        self.__points = self.__calculate_points(np.arange(0, np.pi, step))
+        self.repaint()
 
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = self.__get_painter()
@@ -74,7 +85,11 @@ class GraphicWidget(QFrame):
     def wheelEvent(self, event: QWheelEvent) -> None:
         direction = [-1, 1][event.angleDelta().y() >= 0]
         self.__scale *= 1 + direction * self.__delta_coef
+        self.__wheel_scroll_end_timer.start(500)
         self.repaint()
+
+    def __on_wheel_scroll_end(self) -> None:
+        self.__update_points()
 
 
 class MainWindow(QWidget):
@@ -85,9 +100,8 @@ class MainWindow(QWidget):
         self.__init_widgets()
 
     def __init_widgets(self):
-        self.__graphic = GraphicWidget(self)
+        self.__graphic = GraphicWidget(self, self.__calculate_points)
         self.__graphic.setFixedSize(QSize(400, 400))
-        self.__graphic.draw_points(self.__calculate_points(np.arange(0, np.pi, 0.001)))
 
 
 def main():
