@@ -1,9 +1,9 @@
 import sys
-from typing import Callable
+from typing import Callable, Iterable
 
 import numpy as np
 from PyQt5.QtCore import QSize, Qt, QPoint, QTimer
-from PyQt5.QtGui import QPainter, QPaintEvent, QPen, QMouseEvent, QWheelEvent
+from PyQt5.QtGui import QPainter, QPaintEvent, QPen, QMouseEvent, QWheelEvent, QColor
 from PyQt5.QtWidgets import QApplication, QWidget, QFrame
 
 
@@ -15,6 +15,7 @@ def points_calculator(a: float) -> Callable[[np.arange], np.ndarray]:
         x_values = r_values * cos_phi
         y_values = r_values * sin_phi
         return np.array([x_values, y_values]).transpose()
+
     return calculate_values
 
 
@@ -28,9 +29,10 @@ class GraphicWidget(QFrame):
         self.__center = QPoint(0, 0)
         self.__delta_coef = 0.03
 
+        self.__grid_cell_size = 50
+
         self.__drag_start_point = None
         self.__drag_center_snapshot = None
-        self.setStyleSheet('background-color: grey;')
 
         self.__wheel_scroll_end_timer = QTimer()
         self.__wheel_scroll_end_timer.setSingleShot(True)
@@ -38,8 +40,44 @@ class GraphicWidget(QFrame):
 
         self.__update_points()
 
+    def __get_grid_line_positions(self, center_coord: float, a: int, b: int, step: float) -> Iterable[float]:
+        coordinates = [center_coord]
+        offset = step
+
+        while (a < center_coord - offset) or (center_coord + offset < b):
+            if center_coord - offset < b:
+                coordinates.insert(0, center_coord - offset)
+            if a < center_coord + offset:
+                coordinates.append(center_coord + offset)
+            offset += step
+
+        return coordinates
+
+    def __draw_grid_cells(self, painter: QPainter, cell_size: float) -> None:
+        width, height = self.geometry().width(), self.geometry().height()
+
+        for x in self.__get_grid_line_positions(self.__center.x(), 0, width, cell_size):
+            painter.drawLine(int(x), 0, int(x), height)
+
+        for y in self.__get_grid_line_positions(self.__center.y(), 0, height, cell_size):
+            painter.drawLine(0, int(y), width, int(y))
+
+    def __draw_grid(self, painter: QPainter) -> None:
+        pen = QPen(Qt.gray, 2, Qt.SolidLine)
+        painter.setPen(pen)
+
+        big_cell_size = self.__grid_cell_size * self.__scale
+        small_cell_size = big_cell_size / 5
+
+        painter.setPen(QPen(QColor(220, 220, 220), 2, Qt.SolidLine))
+        self.__draw_grid_cells(painter, small_cell_size)
+
+        painter.setPen(QPen(QColor(192, 192, 192), 2, Qt.SolidLine))
+        self.__draw_grid_cells(painter, big_cell_size)
+
     def __draw_points(self, painter: QPainter) -> None:
         pen = QPen(Qt.black, 4, Qt.SolidLine)
+        painter.translate(self.__center)
         painter.setPen(pen)
 
         for index in range(len(self.__points) - 1):
@@ -49,6 +87,8 @@ class GraphicWidget(QFrame):
                 int(start_point[0]), int(start_point[1]),
                 int(end_point[0]), int(end_point[1]),
             )
+
+        painter.translate(-self.__center)
 
     def __get_painter(self) -> QPainter:
         painter = QPainter()
@@ -63,7 +103,7 @@ class GraphicWidget(QFrame):
     def paintEvent(self, event: QPaintEvent) -> None:
         painter = self.__get_painter()
         painter.begin(self)
-        painter.translate(self.__center)
+        self.__draw_grid(painter)
         self.__draw_points(painter)
         painter.end()
 
