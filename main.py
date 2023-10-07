@@ -2,8 +2,8 @@ import sys
 from typing import Callable, Iterable
 
 import numpy as np
-from PyQt5.QtCore import QSize, Qt, QPoint, QTimer
-from PyQt5.QtGui import QPainter, QPaintEvent, QPen, QMouseEvent, QWheelEvent, QColor
+from PyQt5.QtCore import QSize, Qt, QPoint, QTimer, QRect
+from PyQt5.QtGui import QPainter, QPaintEvent, QPen, QMouseEvent, QWheelEvent, QColor, QFont, QFontMetrics
 from PyQt5.QtWidgets import QApplication, QWidget, QFrame
 
 
@@ -53,18 +53,35 @@ class GraphicWidget(QFrame):
 
         return coordinates
 
-    def __draw_grid_cells(self, painter: QPainter, cell_size: float) -> None:
+    def __draw_grid_cells(self, painter: QPainter, cell_size: float, with_text: bool = False) -> None:
         width, height = self.geometry().width(), self.geometry().height()
 
         for x in self.__get_grid_line_positions(self.__center.x(), 0, width, cell_size):
             painter.drawLine(int(x), 0, int(x), height)
 
+            if with_text:
+                normalized_x = (x - self.__center.x()) / self.__scale
+                represented_position = f"{normalized_x:.2f}"
+                metrics = QFontMetrics(painter.font())
+                rect = QRect(int(x), 0, metrics.width(represented_position), metrics.height())
+                painter.drawText(rect, Qt.AlignLeft | Qt.AlignTop, represented_position)
+
         for y in self.__get_grid_line_positions(self.__center.y(), 0, height, cell_size):
+            if with_text:
+                normalized_y = (y - self.__center.y()) / self.__scale
+                represented_position = f"{normalized_y:.2f}"
+                metrics = QFontMetrics(painter.font())
+                rect = QRect(0, int(y), metrics.width(represented_position), metrics.height())
+                painter.drawText(rect, Qt.AlignLeft | Qt.AlignBottom, represented_position)
+
             painter.drawLine(0, int(y), width, int(y))
 
     def __draw_grid(self, painter: QPainter) -> None:
         pen = QPen(Qt.gray, 2, Qt.SolidLine)
         painter.setPen(pen)
+
+        font = QFont('Arial', 10)
+        painter.setFont(font)
 
         big_cell_size = self.__grid_cell_size * self.__scale
         small_cell_size = big_cell_size / 5
@@ -73,7 +90,7 @@ class GraphicWidget(QFrame):
         self.__draw_grid_cells(painter, small_cell_size)
 
         painter.setPen(QPen(QColor(192, 192, 192), 2, Qt.SolidLine))
-        self.__draw_grid_cells(painter, big_cell_size)
+        self.__draw_grid_cells(painter, big_cell_size, with_text=True)
 
     def __draw_points(self, painter: QPainter) -> None:
         pen = QPen(Qt.black, 4, Qt.SolidLine)
