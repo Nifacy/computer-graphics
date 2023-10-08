@@ -1,10 +1,13 @@
 import sys
+from dataclasses import dataclass
 from typing import Callable, Iterable
 
 import numpy as np
-from PyQt5.QtCore import QSize, Qt, QPoint, QTimer, QRect
+from PyQt5.QtCore import QPoint, QTimer, QRect, pyqtSignal
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter, QPaintEvent, QPen, QMouseEvent, QWheelEvent, QColor, QFont, QFontMetrics
-from PyQt5.QtWidgets import QApplication, QWidget, QFrame
+from PyQt5.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QSpacerItem, QSizePolicy
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QDoubleSpinBox, QCheckBox
 
 
 def points_calculator(a: float) -> Callable[[np.arange], np.ndarray]:
@@ -19,10 +22,131 @@ def points_calculator(a: float) -> Callable[[np.arange], np.ndarray]:
     return calculate_values
 
 
+class SettingsWidget(QWidget):
+    @dataclass(frozen=True)
+    class Settings:
+        render_range: tuple[float, float]
+        precision: float
+        auto_scale: bool
+
+    on_change = pyqtSignal(Settings)
+
+    def __init__(self):
+        super().__init__()
+
+        main_layout = QVBoxLayout()
+        self.__init_widgets(main_layout)
+        self.setLayout(main_layout)
+
+    def __create_double_spin_box(self, start: float, end: float, default: float):
+        spinbox = QDoubleSpinBox()
+        spinbox.setDecimals(2)
+        spinbox.setMinimum(start)
+        spinbox.setMaximum(end)
+        spinbox.setSingleStep(0.01)
+        spinbox.setValue(default)
+        spinbox.setFixedWidth(100)
+        return spinbox
+
+    def __init_range_field(self, layout: QVBoxLayout):
+        subfields_layout = QVBoxLayout()
+
+        self.__left_side_spin_box = self.__create_double_spin_box(0, 2 * np.pi, 0)
+        self.__left_side_spin_box.valueChanged.connect(
+            lambda _: self.__notify_about_settings_changed()
+        )
+
+        self.__right_side_spin_box = self.__create_double_spin_box(0, 2 * np.pi, 2 * np.pi)
+        self.__right_side_spin_box.valueChanged.connect(
+            lambda _: self.__notify_about_settings_changed()
+        )
+
+        left_side_layout = QHBoxLayout()
+        left_side_layout.addWidget(QLabel('Левая грань: '), 0)
+        left_side_layout.addWidget(self.__left_side_spin_box, 1)
+
+        right_side_layout = QHBoxLayout()
+        right_side_layout.addWidget(QLabel('Правая грань: '), 0)
+        right_side_layout.addWidget(self.__right_side_spin_box, 1)
+
+        subfields_layout.addLayout(left_side_layout)
+        subfields_layout.addLayout(right_side_layout)
+        layout.addLayout(subfields_layout)
+
+    def __init_precision_field(self, layout: QVBoxLayout):
+        fields_layout = QVBoxLayout()
+
+        self.__precision_input_field = self.__create_double_spin_box(0.01, 2 * np.pi, 0.03)
+        self.__precision_input_field.valueChanged.connect(lambda _: self.__notify_about_settings_changed())
+
+        self.__auto_precision_checkbox = QCheckBox()
+        self.__auto_precision_checkbox.stateChanged.connect(
+            lambda _: self.__notify_about_settings_changed()
+        )
+        self.__auto_precision_checkbox.stateChanged.connect(
+            lambda state: self.__precision_input_field.setEnabled(state != Qt.Checked)
+        )
+
+        user_defined_precision_field_layout = QHBoxLayout()
+        user_defined_precision_field_layout.addWidget(
+            QLabel('Шаг отрисовки:'),
+            0,
+        )
+        user_defined_precision_field_layout.addWidget(
+            self.__precision_input_field,
+            1,
+        )
+
+        auto_precision_field_layout = QHBoxLayout()
+
+
+        auto_precision_field_layout.addWidget(
+            QLabel('Автоматическое определение'),
+            0,
+        )
+        auto_precision_field_layout.addWidget(
+            self.__auto_precision_checkbox,
+            1,
+        )
+
+        fields_layout.addLayout(user_defined_precision_field_layout)
+        fields_layout.addLayout(auto_precision_field_layout)
+        layout.addLayout(fields_layout)
+
+    def __init_widgets(self, layout: QVBoxLayout):
+        layout.addWidget(QLabel('Область значений'))
+        self.__init_range_field(layout)
+
+        layout.addWidget(QLabel('Точность графика'))
+        self.__init_precision_field(layout)
+
+        layout.addItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        self.setLayout(layout)
+
+    def __notify_about_settings_changed(self):
+        settings = SettingsWidget.Settings(
+            render_range=(
+                self.__left_side_spin_box.value(),
+                self.__right_side_spin_box.value(),
+            ),
+            precision=self.__precision_input_field.value(),
+            auto_scale=self.__auto_precision_checkbox.isChecked(),
+        )
+
+        self.on_change.emit(settings)
+
+
 class GraphicWidget(QFrame):
-    def __init__(self, parent: QWidget | None, calculate_points: Callable[[np.arange], np.ndarray]):
+    def __init__(
+            self,
+            parent: QWidget | None,
+            calculate_points: Callable[[np.arange], np.ndarray],
+            settings_widget: SettingsWidget
+    ):
         super().__init__(parent)
         self.__points: np.ndarray = np.empty((0, 2))
+        self.__render_range = (0, np.pi, 0.03)
+        self.__enable_auto_scale = False
         self.__default_step = 0.2
         self.__scale = 1.0
         self.__calculate_points = calculate_points
@@ -38,6 +162,7 @@ class GraphicWidget(QFrame):
         self.__wheel_scroll_end_timer.setSingleShot(True)
         self.__wheel_scroll_end_timer.timeout.connect(self.__on_wheel_scroll_end)
 
+        settings_widget.on_change.connect(self.__on_settings_changed)
         self.__update_points()
 
     def __get_grid_line_positions(self, center_coord: float, a: int, b: int, step: float) -> Iterable[float]:
@@ -113,8 +238,19 @@ class GraphicWidget(QFrame):
         return painter
 
     def __update_points(self) -> None:
-        step = self.__default_step / self.__scale
-        self.__points = self.__calculate_points(np.arange(0, np.pi, step))
+        render_range = np.arange(
+            self.__render_range[0],
+            self.__render_range[1],
+            self.__default_step / self.__scale if self.__enable_auto_scale else self.__render_range[2]
+        )
+
+        self.__points = self.__calculate_points(render_range)
+        self.repaint()
+
+    def __on_settings_changed(self, settings: SettingsWidget.Settings):
+        self.__render_range = (*settings.render_range, settings.precision)
+        self.__enable_auto_scale = settings.auto_scale
+        self.__update_points()
         self.repaint()
 
     def paintEvent(self, event: QPaintEvent) -> None:
@@ -148,18 +284,25 @@ class GraphicWidget(QFrame):
     def __on_wheel_scroll_end(self) -> None:
         self.__update_points()
 
-
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.__calculate_points = points_calculator(100)
-        self.setFixedSize(QSize(400, 400))
-        self.__init_widgets()
 
-    def __init_widgets(self):
-        self.__graphic = GraphicWidget(self, self.__calculate_points)
-        self.__graphic.setFixedSize(QSize(400, 400))
+        self.__layout = QVBoxLayout()
+        self.__init_widgets(self.__layout)
+        self.setLayout(self.__layout)
 
+    def __init_widgets(self, layout: QVBoxLayout):
+        graph_with_settings_layout = QHBoxLayout()
+
+        settings = SettingsWidget()
+        graph_with_settings_layout.addWidget(settings, 0)
+
+        graphic = GraphicWidget(self, self.__calculate_points, settings)
+        graph_with_settings_layout.addWidget(graphic, 1)
+
+        layout.addLayout(graph_with_settings_layout)
 
 def main():
     app = QApplication(sys.argv)
