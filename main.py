@@ -145,7 +145,7 @@ class GraphicWidget(QFrame):
     ):
         super().__init__(parent)
         self.__points: np.ndarray = np.empty((0, 2))
-        self.__render_range = (0, np.pi, 0.03)
+        self.__render_range = (0, 2 * np.pi, 0.03)
         self.__enable_auto_scale = False
         self.__default_step = 0.2
         self.__scale = 1.0
