@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Callable, Iterable
 
 import numpy as np
-from PyQt5.QtCore import QPoint, QTimer, QRect, pyqtSignal
+from PyQt5.QtCore import QPoint, QTimer, QRect, pyqtSignal, QSize
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPainter, QPaintEvent, QPen, QMouseEvent, QWheelEvent, QColor, QFont, QFontMetrics
 from PyQt5.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QSpacerItem, QSizePolicy
@@ -144,13 +144,14 @@ class GraphicWidget(QFrame):
             settings_widget: SettingsWidget
     ):
         super().__init__(parent)
+
         self.__points: np.ndarray = np.empty((0, 2))
         self.__render_range = (0, 2 * np.pi, 0.03)
         self.__enable_auto_scale = False
         self.__default_step = 0.2
         self.__scale = 1.0
         self.__calculate_points = calculate_points
-        self.__center = QPoint(0, 0)
+        self.__center = None
         self.__delta_coef = 0.03
 
         self.__grid_cell_size = 50
@@ -253,7 +254,12 @@ class GraphicWidget(QFrame):
         self.__update_points()
         self.repaint()
 
+    def __init_center(self):
+        self.__center = QPoint(self.width() // 2, self.height() // 2)
+
     def paintEvent(self, event: QPaintEvent) -> None:
+        if self.__center is None:
+            self.__init_center()
         painter = self.__get_painter()
         painter.begin(self)
         self.__draw_grid(painter)
@@ -287,6 +293,8 @@ class GraphicWidget(QFrame):
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
+        self.setMinimumSize(QSize(700, 400))
+
         self.__calculate_points = points_calculator(100)
 
         self.__layout = QVBoxLayout()
