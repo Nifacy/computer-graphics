@@ -10,16 +10,20 @@ from PyQt5.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QSpacerIt
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QDoubleSpinBox, QCheckBox
 
 
-def points_calculator(a: float) -> Callable[[np.arange], np.ndarray]:
-    def calculate_values(arguments: np.arange) -> np.ndarray:
+class PointCalculator:
+    def __init__(self, a: float):
+        self.__a = a
+
+    def __call__(self, arguments: np.arange) -> np.ndarray:
         sin_phi = np.sin(arguments)
         cos_phi = np.cos(arguments)
-        r_values = 2 * a * sin_phi * cos_phi
+        r_values = 2 * self.__a * sin_phi * cos_phi
         x_values = r_values * cos_phi
         y_values = r_values * sin_phi
         return np.array([x_values, y_values]).transpose()
 
-    return calculate_values
+    def set_a(self, value: float) -> None:
+        self.__a = value
 
 
 class SettingsWidget(QWidget):
@@ -28,6 +32,7 @@ class SettingsWidget(QWidget):
         render_range: tuple[float, float]
         precision: float
         auto_scale: bool
+        a: float
 
     on_change = pyqtSignal(Settings)
 
@@ -38,29 +43,37 @@ class SettingsWidget(QWidget):
         self.__init_widgets(main_layout)
         self.setLayout(main_layout)
 
-    def __create_double_spin_box(self, start: float, end: float, default: float):
+    def __create_double_spin_box(self, start: float, end: float | None, default: float):
         spinbox = QDoubleSpinBox()
         spinbox.setDecimals(2)
         spinbox.setMinimum(start)
-        spinbox.setMaximum(end)
+
+        spinbox.setMaximum(end or float('inf'))
+
         spinbox.setSingleStep(0.01)
         spinbox.setValue(default)
         spinbox.setFixedWidth(100)
+
+        spinbox.valueChanged.connect(
+            lambda _: self.__notify_about_settings_changed()
+        )
+
         return spinbox
+
+    def __init_parameter_field(self, layout: QVBoxLayout):
+        self.__parameter_spin_box = self.__create_double_spin_box(0, None, 100)
+
+        parameter_field_layout = QHBoxLayout()
+        parameter_field_layout.addWidget(QLabel('Параметр a: '), 0)
+        parameter_field_layout.addWidget(self.__parameter_spin_box, 1)
+        layout.addLayout(parameter_field_layout)
 
     def __init_range_field(self, layout: QVBoxLayout):
         subfields_layout = QVBoxLayout()
 
         self.__left_side_spin_box = self.__create_double_spin_box(0, 2 * np.pi, 0)
-        self.__left_side_spin_box.valueChanged.connect(
-            lambda _: self.__notify_about_settings_changed()
-        )
 
         self.__right_side_spin_box = self.__create_double_spin_box(0, 2 * np.pi, 2 * np.pi)
-        self.__right_side_spin_box.valueChanged.connect(
-            lambda _: self.__notify_about_settings_changed()
-        )
-
         left_side_layout = QHBoxLayout()
         left_side_layout.addWidget(QLabel('Левая грань: '), 0)
         left_side_layout.addWidget(self.__left_side_spin_box, 1)
@@ -120,6 +133,8 @@ class SettingsWidget(QWidget):
         layout.addWidget(QLabel('Точность графика'))
         self.__init_precision_field(layout)
 
+        self.__init_parameter_field(layout)
+
         layout.addItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
         self.setLayout(layout)
 
@@ -131,6 +146,7 @@ class SettingsWidget(QWidget):
             ),
             precision=self.__precision_input_field.value(),
             auto_scale=self.__auto_precision_checkbox.isChecked(),
+            a=self.__parameter_spin_box.value(),
         )
 
         self.on_change.emit(settings)
@@ -140,7 +156,7 @@ class GraphicWidget(QFrame):
     def __init__(
             self,
             parent: QWidget | None,
-            calculate_points: Callable[[np.arange], np.ndarray],
+            calculate_points: PointCalculator,
             settings_widget: SettingsWidget
     ):
         super().__init__(parent)
@@ -185,22 +201,62 @@ class GraphicWidget(QFrame):
         for x in self.__get_grid_line_positions(self.__center.x(), 0, width, cell_size):
             painter.drawLine(int(x), 0, int(x), height)
 
-            if with_text:
-                normalized_x = (x - self.__center.x()) / self.__scale
-                represented_position = f"{normalized_x:.2f}"
-                metrics = QFontMetrics(painter.font())
-                rect = QRect(int(x), 0, metrics.width(represented_position), metrics.height())
-                painter.drawText(rect, Qt.AlignLeft | Qt.AlignTop, represented_position)
+        for y in self.__get_grid_line_positions(self.__center.y(), 0, height, cell_size):
+            painter.drawLine(0, int(y), width, int(y))
+
+    def __draw_axis_lines(self, painter: QPainter, cell_size: float):
+        width, height = self.geometry().width(), self.geometry().height()
+        pen = QPen(QColor(100, 100, 100), 4, Qt.SolidLine)
+        painter.setPen(pen)
+
+        x_start = QPoint(0, self.__center.y())
+        x_end = QPoint(self.width(), self.__center.y())
+
+        y_start = QPoint(self.__center.x(), 0)
+        y_end = QPoint(self.__center.x(), self.height())
+
+        left_side_delta = QPoint(-10, -10)
+        right_side_delta = QPoint(-10, 10)
+
+        painter.drawLine(x_start, x_end)
+        painter.drawLine(x_end + left_side_delta, x_end)
+        painter.drawLine(x_end + right_side_delta, x_end)
+
+        text = 'X'
+        metrics = QFontMetrics(painter.font())
+        text_rect_size = QSize(metrics.width(text), metrics.height())
+        rect = QRect(
+            x_end - QPoint(text_rect_size.width() + 10, text_rect_size.height() + 10),
+            text_rect_size
+        )
+        painter.drawText(rect, Qt.AlignBottom, text)
+
+        painter.drawLine(y_start, y_end)
+        painter.drawLine(y_start - left_side_delta, y_start)
+        painter.drawLine(y_start - right_side_delta.transposed(), y_start)
+
+        text = 'Y'
+        metrics = QFontMetrics(painter.font())
+        text_rect_size = QSize(metrics.width(text), metrics.height())
+        rect = QRect(
+            y_start + QPoint(10, 10),
+            text_rect_size
+        )
+        painter.drawText(rect, Qt.AlignBottom, text)
+
+        for x in self.__get_grid_line_positions(self.__center.x(), 0, width, cell_size):
+            normalized_x = (x - self.__center.x()) / self.__scale
+            represented_position = f"{round(normalized_x)}"
+            metrics = QFontMetrics(painter.font())
+            rect = QRect(int(x), self.__center.y(), metrics.width(represented_position), metrics.height())
+            painter.drawText(rect, Qt.AlignLeft | Qt.AlignTop, represented_position)
 
         for y in self.__get_grid_line_positions(self.__center.y(), 0, height, cell_size):
-            if with_text:
-                normalized_y = (y - self.__center.y()) / self.__scale
-                represented_position = f"{normalized_y:.2f}"
-                metrics = QFontMetrics(painter.font())
-                rect = QRect(0, int(y), metrics.width(represented_position), metrics.height())
-                painter.drawText(rect, Qt.AlignLeft | Qt.AlignBottom, represented_position)
-
-            painter.drawLine(0, int(y), width, int(y))
+            normalized_y = (y - self.__center.y()) / self.__scale
+            represented_position = f"{round(normalized_y)}"
+            metrics = QFontMetrics(painter.font())
+            rect = QRect(self.__center.x(), int(y), metrics.width(represented_position), metrics.height())
+            painter.drawText(rect, Qt.AlignLeft | Qt.AlignBottom, represented_position)
 
     def __draw_grid(self, painter: QPainter) -> None:
         pen = QPen(Qt.gray, 2, Qt.SolidLine)
@@ -217,6 +273,8 @@ class GraphicWidget(QFrame):
 
         painter.setPen(QPen(QColor(192, 192, 192), 2, Qt.SolidLine))
         self.__draw_grid_cells(painter, big_cell_size, with_text=True)
+
+        self.__draw_axis_lines(painter, big_cell_size)
 
     def __draw_points(self, painter: QPainter) -> None:
         pen = QPen(Qt.black, 4, Qt.SolidLine)
@@ -251,6 +309,7 @@ class GraphicWidget(QFrame):
     def __on_settings_changed(self, settings: SettingsWidget.Settings):
         self.__render_range = (*settings.render_range, settings.precision)
         self.__enable_auto_scale = settings.auto_scale
+        self.__calculate_points.set_a(settings.a)
         self.__update_points()
         self.repaint()
 
@@ -295,7 +354,7 @@ class MainWindow(QWidget):
         super().__init__()
         self.setMinimumSize(QSize(700, 400))
 
-        self.__calculate_points = points_calculator(100)
+        self.__calculate_points = PointCalculator(100)
 
         self.__layout = QVBoxLayout()
         self.__init_widgets(self.__layout)
