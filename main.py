@@ -202,6 +202,45 @@ class GraphicWidget(QFrame):
 
             painter.drawLine(0, int(y), width, int(y))
 
+    def __draw_axis_lines(self, painter: QPainter):
+        pen = QPen(QColor(100, 100, 100), 4, Qt.SolidLine)
+        painter.setPen(pen)
+
+        x_start = QPoint(0, self.__center.y())
+        x_end = QPoint(self.width(), self.__center.y())
+
+        y_start = QPoint(self.__center.x(), 0)
+        y_end = QPoint(self.__center.x(), self.height())
+
+        left_side_delta = QPoint(-10, -10)
+        right_side_delta = QPoint(-10, 10)
+
+        painter.drawLine(x_start, x_end)
+        painter.drawLine(x_end + left_side_delta, x_end)
+        painter.drawLine(x_end + right_side_delta, x_end)
+
+        text = 'X'
+        metrics = QFontMetrics(painter.font())
+        text_rect_size = QSize(metrics.width(text), metrics.height())
+        rect = QRect(
+            x_end - QPoint(text_rect_size.width() + 10, text_rect_size.height() + 10),
+            text_rect_size
+        )
+        painter.drawText(rect, Qt.AlignBottom, text)
+
+        painter.drawLine(y_start, y_end)
+        painter.drawLine(y_start - left_side_delta, y_start)
+        painter.drawLine(y_start - right_side_delta.transposed(), y_start)
+
+        text = 'Y'
+        metrics = QFontMetrics(painter.font())
+        text_rect_size = QSize(metrics.width(text), metrics.height())
+        rect = QRect(
+            y_start + QPoint(10, 10),
+            text_rect_size
+        )
+        painter.drawText(rect, Qt.AlignBottom, text)
+
     def __draw_grid(self, painter: QPainter) -> None:
         pen = QPen(Qt.gray, 2, Qt.SolidLine)
         painter.setPen(pen)
@@ -217,6 +256,8 @@ class GraphicWidget(QFrame):
 
         painter.setPen(QPen(QColor(192, 192, 192), 2, Qt.SolidLine))
         self.__draw_grid_cells(painter, big_cell_size, with_text=True)
+
+        self.__draw_axis_lines(painter)
 
     def __draw_points(self, painter: QPainter) -> None:
         pen = QPen(Qt.black, 4, Qt.SolidLine)
