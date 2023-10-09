@@ -185,24 +185,11 @@ class GraphicWidget(QFrame):
         for x in self.__get_grid_line_positions(self.__center.x(), 0, width, cell_size):
             painter.drawLine(int(x), 0, int(x), height)
 
-            if with_text:
-                normalized_x = (x - self.__center.x()) / self.__scale
-                represented_position = f"{normalized_x:.2f}"
-                metrics = QFontMetrics(painter.font())
-                rect = QRect(int(x), 0, metrics.width(represented_position), metrics.height())
-                painter.drawText(rect, Qt.AlignLeft | Qt.AlignTop, represented_position)
-
         for y in self.__get_grid_line_positions(self.__center.y(), 0, height, cell_size):
-            if with_text:
-                normalized_y = (y - self.__center.y()) / self.__scale
-                represented_position = f"{normalized_y:.2f}"
-                metrics = QFontMetrics(painter.font())
-                rect = QRect(0, int(y), metrics.width(represented_position), metrics.height())
-                painter.drawText(rect, Qt.AlignLeft | Qt.AlignBottom, represented_position)
-
             painter.drawLine(0, int(y), width, int(y))
 
-    def __draw_axis_lines(self, painter: QPainter):
+    def __draw_axis_lines(self, painter: QPainter, cell_size: float):
+        width, height = self.geometry().width(), self.geometry().height()
         pen = QPen(QColor(100, 100, 100), 4, Qt.SolidLine)
         painter.setPen(pen)
 
@@ -241,6 +228,20 @@ class GraphicWidget(QFrame):
         )
         painter.drawText(rect, Qt.AlignBottom, text)
 
+        for x in self.__get_grid_line_positions(self.__center.x(), 0, width, cell_size):
+            normalized_x = (x - self.__center.x()) / self.__scale
+            represented_position = f"{round(normalized_x)}"
+            metrics = QFontMetrics(painter.font())
+            rect = QRect(int(x), self.__center.y(), metrics.width(represented_position), metrics.height())
+            painter.drawText(rect, Qt.AlignLeft | Qt.AlignTop, represented_position)
+
+        for y in self.__get_grid_line_positions(self.__center.y(), 0, height, cell_size):
+            normalized_y = (y - self.__center.y()) / self.__scale
+            represented_position = f"{round(normalized_y)}"
+            metrics = QFontMetrics(painter.font())
+            rect = QRect(self.__center.x(), int(y), metrics.width(represented_position), metrics.height())
+            painter.drawText(rect, Qt.AlignLeft | Qt.AlignBottom, represented_position)
+
     def __draw_grid(self, painter: QPainter) -> None:
         pen = QPen(Qt.gray, 2, Qt.SolidLine)
         painter.setPen(pen)
@@ -257,7 +258,7 @@ class GraphicWidget(QFrame):
         painter.setPen(QPen(QColor(192, 192, 192), 2, Qt.SolidLine))
         self.__draw_grid_cells(painter, big_cell_size, with_text=True)
 
-        self.__draw_axis_lines(painter)
+        self.__draw_axis_lines(painter, big_cell_size)
 
     def __draw_points(self, painter: QPainter) -> None:
         pen = QPen(Qt.black, 4, Qt.SolidLine)
