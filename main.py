@@ -10,16 +10,20 @@ from PyQt5.QtWidgets import QApplication, QFrame, QHBoxLayout, QLabel, QSpacerIt
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QDoubleSpinBox, QCheckBox
 
 
-def points_calculator(a: float) -> Callable[[np.arange], np.ndarray]:
-    def calculate_values(arguments: np.arange) -> np.ndarray:
+class PointCalculator:
+    def __init__(self, a: float):
+        self.__a = a
+
+    def __call__(self, arguments: np.arange) -> np.ndarray:
         sin_phi = np.sin(arguments)
         cos_phi = np.cos(arguments)
-        r_values = 2 * a * sin_phi * cos_phi
+        r_values = 2 * self.__a * sin_phi * cos_phi
         x_values = r_values * cos_phi
         y_values = r_values * sin_phi
         return np.array([x_values, y_values]).transpose()
 
-    return calculate_values
+    def set_a(self, value: float) -> None:
+        self.__a = value
 
 
 class SettingsWidget(QWidget):
@@ -28,6 +32,7 @@ class SettingsWidget(QWidget):
         render_range: tuple[float, float]
         precision: float
         auto_scale: bool
+        a: float
 
     on_change = pyqtSignal(Settings)
 
@@ -38,29 +43,37 @@ class SettingsWidget(QWidget):
         self.__init_widgets(main_layout)
         self.setLayout(main_layout)
 
-    def __create_double_spin_box(self, start: float, end: float, default: float):
+    def __create_double_spin_box(self, start: float, end: float | None, default: float):
         spinbox = QDoubleSpinBox()
         spinbox.setDecimals(2)
         spinbox.setMinimum(start)
-        spinbox.setMaximum(end)
+
+        spinbox.setMaximum(end or float('inf'))
+
         spinbox.setSingleStep(0.01)
         spinbox.setValue(default)
         spinbox.setFixedWidth(100)
+
+        spinbox.valueChanged.connect(
+            lambda _: self.__notify_about_settings_changed()
+        )
+
         return spinbox
+
+    def __init_parameter_field(self, layout: QVBoxLayout):
+        self.__parameter_spin_box = self.__create_double_spin_box(0, None, 100)
+
+        parameter_field_layout = QHBoxLayout()
+        parameter_field_layout.addWidget(QLabel('Параметр a: '), 0)
+        parameter_field_layout.addWidget(self.__parameter_spin_box, 1)
+        layout.addLayout(parameter_field_layout)
 
     def __init_range_field(self, layout: QVBoxLayout):
         subfields_layout = QVBoxLayout()
 
         self.__left_side_spin_box = self.__create_double_spin_box(0, 2 * np.pi, 0)
-        self.__left_side_spin_box.valueChanged.connect(
-            lambda _: self.__notify_about_settings_changed()
-        )
 
         self.__right_side_spin_box = self.__create_double_spin_box(0, 2 * np.pi, 2 * np.pi)
-        self.__right_side_spin_box.valueChanged.connect(
-            lambda _: self.__notify_about_settings_changed()
-        )
-
         left_side_layout = QHBoxLayout()
         left_side_layout.addWidget(QLabel('Левая грань: '), 0)
         left_side_layout.addWidget(self.__left_side_spin_box, 1)
@@ -120,6 +133,8 @@ class SettingsWidget(QWidget):
         layout.addWidget(QLabel('Точность графика'))
         self.__init_precision_field(layout)
 
+        self.__init_parameter_field(layout)
+
         layout.addItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
         self.setLayout(layout)
 
@@ -131,6 +146,7 @@ class SettingsWidget(QWidget):
             ),
             precision=self.__precision_input_field.value(),
             auto_scale=self.__auto_precision_checkbox.isChecked(),
+            a=self.__parameter_spin_box.value(),
         )
 
         self.on_change.emit(settings)
@@ -140,7 +156,7 @@ class GraphicWidget(QFrame):
     def __init__(
             self,
             parent: QWidget | None,
-            calculate_points: Callable[[np.arange], np.ndarray],
+            calculate_points: PointCalculator,
             settings_widget: SettingsWidget
     ):
         super().__init__(parent)
@@ -293,6 +309,7 @@ class GraphicWidget(QFrame):
     def __on_settings_changed(self, settings: SettingsWidget.Settings):
         self.__render_range = (*settings.render_range, settings.precision)
         self.__enable_auto_scale = settings.auto_scale
+        self.__calculate_points.set_a(settings.a)
         self.__update_points()
         self.repaint()
 
@@ -337,7 +354,7 @@ class MainWindow(QWidget):
         super().__init__()
         self.setMinimumSize(QSize(700, 400))
 
-        self.__calculate_points = points_calculator(100)
+        self.__calculate_points = PointCalculator(100)
 
         self.__layout = QVBoxLayout()
         self.__init_widgets(self.__layout)
