@@ -64,6 +64,7 @@ class Canvas(QFrame):
         self._renderer = renderer.Renderer(renderer.Config(
             d=1,
             view_size=(1.0, 1.0),
+            mode=renderer.RenderMode.WIREFRAME,
         ))
 
     def put_pixel(self, image: QImage, point: tuple[int, int], color: QColor) -> None:

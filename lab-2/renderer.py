@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 from typing import NamedTuple, Protocol
 
 
@@ -63,10 +64,16 @@ class _ViewportWithZBuffer:
         return self._viewport.height()
 
 
+class RenderMode(Enum):
+    WIREFRAME = 1
+    FILL = 2
+
+
 @dataclass
 class Config:
     d: float
     view_size: tuple[float, float]
+    mode: RenderMode
 
 
 class Renderer:
@@ -103,6 +110,45 @@ class Renderer:
 
         return values
 
+    def _draw_3d_line(self, viewport: _ViewportWithZBuffer, p0: Point, p1: Point, color: Color) -> None:
+        canvas_size = viewport.width(), viewport.height()
+
+        a = self._project_point(canvas_size, p0), p0.z
+        b = self._project_point(canvas_size, p1), p1.z
+
+        # if it as a point
+        if a[0] == b[0]:
+            viewport.put_pixel(a[0], a[1], color)
+            return
+
+        # if it is a horizontal line
+        if abs(a[0].x - b[0].x) > abs(a[0].y - b[0].y):
+            if a[0].x > b[0].x:
+                a, b = b, a
+
+            ys = self._interpolate(a[0].x, a[0].y, b[0].x, b[0].y)
+            zs = self._interpolate(a[0].x, a[1], b[0].x, b[1])
+
+            for x, y, z in zip(range(a[0].x, b[0].x + 1), ys, zs):
+                viewport.put_pixel(Point2D(x, int(y)), z, color)
+
+        # if it is a vertical line
+        else:
+            if a[0].y > b[0].y:
+                a, b = b, a
+
+            xs = self._interpolate(a[0].y, a[0].x, b[0].y, b[0].x)
+            zs = self._interpolate(a[0].y, a[1], b[0].y, b[1])
+
+            for y, x, z in zip(range(a[0].y, b[0].y + 1), xs, zs):
+                viewport.put_pixel(Point2D(int(x), y), z, color)
+
+    def _draw_bordered_triangle(self, viewport: _ViewportWithZBuffer, triangle: Triangle) -> None:
+        a, b, c = triangle.points
+        self._draw_3d_line(viewport, a, b, triangle.color)
+        self._draw_3d_line(viewport, b, c, triangle.color)
+        self._draw_3d_line(viewport, c, a, triangle.color)
+
     def _draw_3d_triangle(self, viewport: _ViewportWithZBuffer, triangle: Triangle) -> None:
         canvas_size = viewport.width(), viewport.height()
         projected_points = map(lambda p: (self._project_point(canvas_size, p), p.z), triangle.points)
@@ -132,4 +178,7 @@ class Renderer:
         _viewport = _ViewportWithZBuffer(viewport)
 
         for triangle in triangles:
-            self._draw_3d_triangle(_viewport, triangle)
+            if self._config.mode == RenderMode.WIREFRAME:
+                self._draw_bordered_triangle(_viewport, triangle)
+            else:
+                self._draw_3d_triangle(_viewport, triangle)
