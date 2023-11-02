@@ -50,7 +50,7 @@ class _ViewportWithZBuffer:
         if x < 0 or y < 0 or self._size[0] <= x or self._size[0] <= y:
             return False
         
-        return z < self._zbuffer[x][y]
+        return z > self._zbuffer[x][y]
 
     def put_pixel(self, point: Point2D, z: float, color: Color) -> None:
         if self._can_be_changed(point, z):
@@ -80,23 +80,23 @@ def _project_point(d: float, point: Point) -> Point2D:
 
 
 def _draw_3d_triangle(viewport: _ViewportWithZBuffer, triangle: Triangle) -> None:
-    p0, p1, p2 = map(partial(_project_point, 1), triangle.points)
-    p0, p1, p2 = sorted([p0, p1, p2], key=lambda p: p.y)
+    projected_points = map(lambda p: (_project_point(1, p), p.z), triangle.points)
+    [p0, z0], [p1, z1], [p2, z2] = sorted(projected_points, key=lambda p: p[0].y)
 
-    x0 = _interpolate(p0.y, p0.x, p2.y, p2.x)
+    x02 = _interpolate(p0.y, p0.x, p2.y, p2.x)
     x01 = _interpolate(p0.y, p0.x, p1.y, p1.x)
     x12 = _interpolate(p1.y, p1.x, p2.y, p2.x)
     x01.pop()
     x012 = x01 + x12
 
-    z0 = _interpolate(p0.y, 1 / p0.z, p2.y, 1 / p2.z)
-    z01 = _interpolate(p0.y, 1 / p0.z, p1.y, 1 / p1.z)
-    z12 = _interpolate(p1.y, 1 / p1.z, p2.y,  1 / p2.z)
+    z02 = _interpolate(p0.y, 1 / z0, p2.y, 1 / z2)
+    z01 = _interpolate(p0.y, 1 / z0, p1.y, 1 / z1)
+    z12 = _interpolate(p1.y, 1 / z1, p2.y,  1 / z2)
     z01.pop()
 
     z012 = z01 + z12
 
-    for y, x1, x2, z1, z2 in zip(range(p0.y, p2.y + 1), x0, x012, z0, z012):
+    for y, x1, x2, z1, z2 in zip(range(p0.y, p2.y + 1), x02, x012, z02, z012):
         x_left, x_right = map(int, sorted((x1, x2)))
         zs = _interpolate(x_left, z1, x_right, z2)
 
