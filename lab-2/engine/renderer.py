@@ -1,32 +1,12 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import NamedTuple, Protocol
+from typing import Protocol
 
-
-class Point(NamedTuple):
-    x: float
-    y: float
-    z: float
-
-
-class Point2D(NamedTuple):
-    x: int
-    y: int
-
-
-class Color(NamedTuple):
-    r: int
-    g: int
-    b: int
-
-
-class Triangle(NamedTuple):
-    points: tuple[Point, Point, Point]
-    color: Color
+from . import models
 
 
 class IViewport(Protocol):
-    def put_pixel(self, point: Point2D, color: Color) -> None:
+    def put_pixel(self, point: models.Point2D, color: models.Color) -> None:
         ...
 
     def width(self) -> int:
@@ -40,20 +20,22 @@ class _ViewportWithZBuffer:
     def __init__(self, viewport: IViewport) -> None:
         w, h = viewport.width(), viewport.height()
 
-        self._center = Point2D(- w // 2,  - h // 2)
+        self._center = models.Point2D(- w // 2,  - h // 2)
         self._size = (w, h)
         self._zbuffer = [[0.0] * w for _ in range(h)]
         self._viewport = viewport
 
-    def _can_be_changed(self, point: Point2D, z: float) -> bool:
+    def _can_be_changed(self, point: models.Point2D, z: float) -> bool:
         x, y = point.x - self._center.x, point.y - self._center.y
 
         if x < 0 or y < 0 or self._size[0] <= x or self._size[0] <= y:
             return False
         
-        return z > self._zbuffer[x][y]
+        result = z > self._zbuffer[x][y]
+        self._zbuffer[x][y] = max(self._zbuffer[x][y], z)
+        return result
 
-    def put_pixel(self, point: Point2D, z: float, color: Color) -> None:
+    def put_pixel(self, point: models.Point2D, z: float, color: models.Color) -> None:
         if self._can_be_changed(point, z):
             self._viewport.put_pixel(point, color)
 
@@ -69,31 +51,45 @@ class RenderMode(Enum):
     FILL = 2
 
 
+class ProjectionType(Enum):
+    ISOMETRIC = 1
+    PERSPECTIVE = 2
+
+
 @dataclass
 class Config:
     d: float
     view_size: tuple[float, float]
     mode: RenderMode
+    projection: ProjectionType
 
 
 class Renderer:
     def __init__(self, config: Config) -> None:
         self._config = config
 
-    def _to_canvas_coords(self, canvas_size: tuple[int, int], x: float, y: float) -> Point2D:
-        p = Point2D(
+    def _to_canvas_coords(self, canvas_size: tuple[int, int], x: float, y: float) -> models.Point2D:
+        p = models.Point2D(
             int(x / self._config.view_size[0] * canvas_size[0]),
             int(y / self._config.view_size[1] * canvas_size[1]),
         )
 
         return p
 
-    def _project_point(self, canvas_size: tuple[int, int], point: Point) -> Point2D:
+    def _project_point_1(self, canvas_size: tuple[int, int], point: models.Point) -> models.Point2D:
         return self._to_canvas_coords(
             canvas_size,
             point.x * self._config.d / point.z,
             point.y * self._config.d / point.z,
         )
+
+    def _project_point_2(self, canvas_size: tuple[int, int], point: models.Point) -> models.Point2D:
+        return self._to_canvas_coords(canvas_size, point.x, point.y)
+
+    def _project_point(self, canvas_size: tuple[int, int], point: models.Point) -> models.Point2D:
+        if self._config.projection == ProjectionType.ISOMETRIC:
+            return self._project_point_2(canvas_size, point)
+        return self._project_point_1(canvas_size, point)
 
     @staticmethod
     def _interpolate(i0: int, d0: int, i1: int, d1: int) -> list[float]:
@@ -110,7 +106,7 @@ class Renderer:
 
         return values
 
-    def _draw_3d_line(self, viewport: _ViewportWithZBuffer, p0: Point, p1: Point, color: Color) -> None:
+    def _draw_3d_line(self, viewport: _ViewportWithZBuffer, p0: models.Point, p1: models.Point, color: models.Color) -> None:
         canvas_size = viewport.width(), viewport.height()
 
         a = self._project_point(canvas_size, p0), p0.z
@@ -130,7 +126,7 @@ class Renderer:
             zs = self._interpolate(a[0].x, a[1], b[0].x, b[1])
 
             for x, y, z in zip(range(a[0].x, b[0].x + 1), ys, zs):
-                viewport.put_pixel(Point2D(x, int(y)), z, color)
+                viewport.put_pixel(models.Point2D(x, int(y)), z, color)
 
         # if it is a vertical line
         else:
@@ -141,15 +137,15 @@ class Renderer:
             zs = self._interpolate(a[0].y, a[1], b[0].y, b[1])
 
             for y, x, z in zip(range(a[0].y, b[0].y + 1), xs, zs):
-                viewport.put_pixel(Point2D(int(x), y), z, color)
+                viewport.put_pixel(models.Point2D(int(x), y), z, color)
 
-    def _draw_bordered_triangle(self, viewport: _ViewportWithZBuffer, triangle: Triangle) -> None:
+    def _draw_bordered_triangle(self, viewport: _ViewportWithZBuffer, triangle: models.Triangle) -> None:
         a, b, c = triangle.points
         self._draw_3d_line(viewport, a, b, triangle.color)
         self._draw_3d_line(viewport, b, c, triangle.color)
         self._draw_3d_line(viewport, c, a, triangle.color)
 
-    def _draw_3d_triangle(self, viewport: _ViewportWithZBuffer, triangle: Triangle) -> None:
+    def _draw_3d_triangle(self, viewport: _ViewportWithZBuffer, triangle: models.Triangle) -> None:
         canvas_size = viewport.width(), viewport.height()
         projected_points = map(lambda p: (self._project_point(canvas_size, p), p.z), triangle.points)
         [p0, z0], [p1, z1], [p2, z2] = sorted(projected_points, key=lambda p: p[0].y)
@@ -172,9 +168,9 @@ class Renderer:
             zs = self._interpolate(x_left, z1, x_right, z2)
 
             for x, z in zip(range(x_left, x_right + 1), zs):
-                viewport.put_pixel(Point2D(x, y), z, triangle.color)
+                viewport.put_pixel(models.Point2D(x, y), z, triangle.color)
 
-    def render(self, viewport: IViewport, triangles: list[Triangle]) -> None:
+    def render(self, viewport: IViewport, triangles: list[models.Triangle]) -> None:
         _viewport = _ViewportWithZBuffer(viewport)
 
         for triangle in triangles:
