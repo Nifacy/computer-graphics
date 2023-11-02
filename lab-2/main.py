@@ -53,13 +53,18 @@ class Canvas(QFrame):
         self._triangles = [
             renderer.Triangle(
                 points=(
-                    renderer.Point(0, 100, 2),
-                    renderer.Point(-200, - 100, 6),
-                    renderer.Point(0,- 100, 8),
+                    renderer.Point(0, 1, 2),
+                    renderer.Point(-2, -1, 6),
+                    renderer.Point(0, -1, 8),
                 ),
                 color=renderer.Color(255, 0, 0),
             ),
         ]
+
+        self._renderer = renderer.Renderer(renderer.Config(
+            d=1,
+            view_size=(1.0, 1.0),
+        ))
 
     def put_pixel(self, image: QImage, point: tuple[int, int], color: QColor) -> None:
         image.setPixelColor(point[0], point[1], color)
@@ -69,7 +74,7 @@ class Canvas(QFrame):
         viewport = QImageViewport(self.size().width(), self.size().height())
 
         painter.begin(self)
-        renderer.render(viewport, self._triangles)
+        self._renderer.render(viewport, self._triangles)
         painter.drawImage(0, 0, viewport.image)
         painter.end()
 
