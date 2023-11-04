@@ -111,5 +111,6 @@ class Renderer:
         viewport.update(pixels)
 
     def __del__(self) -> None:
-        self._process.terminate()
-        self._process.wait()
+        if hasattr(self, '_process'):
+            self._process.terminate()
+            self._process.wait()
