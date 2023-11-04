@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Protocol
 
+import numpy
+
 from . import models
 
 
@@ -124,8 +126,26 @@ class Renderer:
 
         return values
 
+    def _out_of_range(self, point: models.Point) -> bool:
+        return point.z <= self._config.d
+
+    def _cut_line(self, p0: models.Point, p1: models.Point) -> tuple[models.Point, models.Point]:
+        dp = p1 - p0
+        t = (self._config.d - p0.z) / dp.z
+        p = p0 + dp * t
+
+        if 0 <= t <= 1:
+            return (p, p1) if dp.z > 0 else (p0, p)
+        return p0, p1
+
     def _draw_3d_line(self, viewport: _ViewportWithZBuffer, p0: models.Point, p1: models.Point, color: models.Color) -> None:
         canvas_size = viewport.width(), viewport.height()
+
+        if self._out_of_range(p0) and self._out_of_range(p1):
+            return
+        
+        if self._out_of_range(p0) or self._out_of_range(p1):
+            p0, p1 = self._cut_line(p0, p1)
 
         a = self._project_point(canvas_size, p0), p0.z
         b = self._project_point(canvas_size, p1), p1.z
@@ -191,6 +211,45 @@ class Renderer:
             for x, z in zip(range(x_left, x_right + 1), zs):
                 viewport.put_pixel(models.Point2D(x, y), z, triangle.color)
 
+    def _draw_filled_triangle(self, viewport: _ViewportWithZBuffer, triangle: models.Triangle) -> None:
+        a, b, c = triangle.points
+
+        if self._out_of_range(a) and self._out_of_range(b):
+            a, c = self._cut_line(a, c)
+            b, c = self._cut_line(b, c)
+            self._draw_3d_triangle(viewport, models.Triangle((a, b, c), triangle.color))
+        
+        elif self._out_of_range(a) and self._out_of_range(c):
+            a, b = self._cut_line(a, b)
+            b, c = self._cut_line(b, c)
+            self._draw_3d_triangle(viewport, models.Triangle((a, b, c), triangle.color))
+
+        elif self._out_of_range(b) and self._out_of_range(c):
+            a, c = self._cut_line(a, b)
+            b, c = self._cut_line(b, c)
+            self._draw_3d_triangle(viewport, models.Triangle((a, b, c), triangle.color))
+
+        elif self._out_of_range(a):
+            a1, b = self._cut_line(a, b)
+            a2, c = self._cut_line(a, c)
+            self._draw_3d_triangle(viewport, models.Triangle((a1, b, c), triangle.color))
+            self._draw_3d_triangle(viewport, models.Triangle((a2, b, c), triangle.color))
+
+        elif self._out_of_range(b):
+            a, b1 = self._cut_line(a, b)
+            b2, c = self._cut_line(b, c)
+            self._draw_3d_triangle(viewport, models.Triangle((a, b1, c), triangle.color))
+            self._draw_3d_triangle(viewport, models.Triangle((a, b2, c), triangle.color))
+        
+        elif self._out_of_range(c):
+            a, c1 = self._cut_line(a, c)
+            b, c2 = self._cut_line(b, c)
+            self._draw_3d_triangle(viewport, models.Triangle((a, b, c1), triangle.color))
+            self._draw_3d_triangle(viewport, models.Triangle((a, b, c2), triangle.color))
+        
+        else:
+            self._draw_3d_triangle(viewport, triangle)
+
     def render(self, viewport: IViewport, triangles: list[models.Triangle]) -> None:
         _viewport = _ViewportWithZBuffer(viewport)
 
@@ -198,4 +257,4 @@ class Renderer:
             if self._config.mode == RenderMode.WIREFRAME:
                 self._draw_bordered_triangle(_viewport, triangle)
             else:
-                self._draw_3d_triangle(_viewport, triangle)
+                self._draw_filled_triangle(_viewport, triangle)
