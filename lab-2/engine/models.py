@@ -13,6 +13,13 @@ class Point(NamedTuple):
             self.z + other.z,
         )
 
+    def __sub__(self, other: 'Point') -> 'Point':
+        return Point(
+            self.x - other.x,
+            self.y - other.y,
+            self.z - other.z,
+        )
+
     def __mul__(self, coef: float) -> 'Point':
         return Point(
             self.x * coef,

@@ -68,6 +68,24 @@ class Renderer:
     def __init__(self, config: Config) -> None:
         self._config = config
 
+    def _mult(self, a: models.Point, b: models.Point) -> models.Point:
+        return models.Point(
+            a.y * b.z - b.y * a.z,
+            a.z * b.x - a.x * b.z,
+            a.x * b.y - b.x * a.y,
+        )
+
+    def _scalar(self, v: models.Point, w: models.Point) -> float:
+        return v.x * w.x + v.y * w.y + v.z * w.z
+
+    def _is_back_facing(self, triangle: models.Triangle) -> bool:
+        v = triangle.points[1] - triangle.points[0]
+        w = triangle.points[2] - triangle.points[0]
+        n = self._mult(v, w)
+        h = (triangle.points[0] + triangle.points[1] + triangle.points[2]) * (1 / 3)
+
+        return self._scalar(n, h) < 0
+
     def _to_canvas_coords(self, canvas_size: tuple[int, int], x: float, y: float) -> models.Point2D:
         p = models.Point2D(
             int(x / self._config.view_size[0] * canvas_size[0]),
@@ -146,6 +164,9 @@ class Renderer:
         self._draw_3d_line(viewport, c, a, triangle.color)
 
     def _draw_3d_triangle(self, viewport: _ViewportWithZBuffer, triangle: models.Triangle) -> None:
+        if self._is_back_facing(triangle):
+            return
+
         canvas_size = viewport.width(), viewport.height()
         projected_points = map(lambda p: (self._project_point(canvas_size, p), p.z), triangle.points)
         [p0, z0], [p1, z1], [p2, z2] = sorted(projected_points, key=lambda p: p[0].y)
