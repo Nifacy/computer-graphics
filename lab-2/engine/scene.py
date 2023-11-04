@@ -8,7 +8,7 @@ from . import models
 class GameObject:
     def __init__(self, scale: float, rotation: models.Point, position: models.Point, mesh: models.Mesh) -> None:
         self._mesh = mesh
-        self._position = position
+        self.position = position
         self.rotation = rotation
         self.scale = scale
 
@@ -16,9 +16,9 @@ class GameObject:
         for triangle in triangles:
             yield models.Triangle(
                 (
-                    triangle.points[0] + self._position,
-                    triangle.points[1] + self._position,
-                    triangle.points[2] + self._position,
+                    triangle.points[0] + self.position,
+                    triangle.points[1] + self.position,
+                    triangle.points[2] + self.position,
                 ),
                 triangle.color,
             )
