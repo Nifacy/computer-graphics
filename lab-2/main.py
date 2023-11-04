@@ -9,7 +9,7 @@ from PyQt5.QtGui import QPainter, QPaintEvent, QImage, QColor
 from PyQt5.QtWidgets import QApplication, QFrame
 from PyQt5.QtWidgets import QWidget
 
-from engine import renderer, models, scene
+from engine import model, renderer, models, scene
 
 
 class QImageViewport(renderer.IViewport):
@@ -45,47 +45,13 @@ class Canvas(QFrame):
         super().__init__(parent)
         self.setFixedSize(QSize(400, 400))
 
-        points = [
-            models.Point(-0.5, 0, -0.5),
-            models.Point(-0.5, 0, 0.5),
-            models.Point(0.5, 0, 0.5),
-            models.Point(0.5, 0, -0.5),
-            models.Point(0, 1, 0),
-        ]
-
-        mesh = [
-            models.Triangle(
-                points=(points[0], points[1], points[2]),
-                color=models.Color(255, 0, 0),
-            ),
-
-            models.Triangle(
-                points=(points[0], points[2], points[3]),
-                color=models.Color(255, 0, 0),
-            ),
-
-            models.Triangle(
-                points=(points[1], points[0], points[4]),
-                color=models.Color(0, 255, 0),
-            ),
-
-            models.Triangle(
-                points=(points[2], points[1], points[4]),
-                color=models.Color(0, 0, 255),
-            ),
-
-            models.Triangle(
-                points=(points[3], points[2], points[4]),
-                color=models.Color(255, 255, 0),
-            ),
-
-            models.Triangle(
-                points=(points[0], points[3], points[4]),
-                color=models.Color(255, 0, 255),
-            )
-        ]
-
-        self._pyramid = scene.GameObject(2, models.Point(0, 0, 0), models.Point(0, 0, 5), mesh)
+        self._pyramid = scene.GameObject(
+            scale=2,
+            rotation=models.Point(0, 0, 0),
+            position=models.Point(0, 0, 5),
+            mesh=model.load('./models/pyramid.obj'),
+        )
+        
         self._renderer = renderer.Renderer(renderer.Config(
             d=1,
             view_size=(1.0, 1.0),
