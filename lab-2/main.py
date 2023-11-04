@@ -1,5 +1,6 @@
 import sys
-import time
+
+import numpy as np
 
 import engine.renderer as renderer
 
@@ -14,35 +15,29 @@ from engine import renderer, models, scene
 class QImageViewport(renderer.IViewport):
     def __init__(self, width: int, height: int) -> None:
         self._image = self.__create_image(width, height)
-        self._cx, self._cy = width // 2, height // 2
-        self._w, self._h = width, height
+        self._width = width
+        self._height = height
 
     @staticmethod
     def __create_image(width: str, height: str) -> QImage:
-        image = QImage(QSize(width, height), QImage.Format_RGB32)
-        image.fill(QColor(255, 255, 255))
+        image = QImage(QSize(width, height), QImage.Format_RGBA8888)
+        image.fill(QColor(255, 255, 255, 255))
         return image
 
-    @staticmethod
-    def __to_bin_format(color: models.Color) -> int:
-        return color.b + (color.g << 8) + (color.r << 16)
+    def update(self, data: np.ndarray) -> None:
+        bytesPerLine = 4 * self.width()
+        qimage = QImage(data.data, self.width(), self.height(), bytesPerLine, QImage.Format_RGBA8888)
+        self._image = qimage
 
-    def put_pixel(self, point: models.Point, color: models.Color) -> None:
-        x = self._cx + point.x
-        y = self._cy - point.y
-
-        if 0 <= x < self.width() and 0 <= y < self.height():
-            self._image.setPixel(x, y, self.__to_bin_format(color))
-    
     @property
     def image(self) -> QImage:
         return self._image
 
     def width(self) -> int:
-        return self._image.width()
+        return self._width
     
     def height(self) -> int:
-        return self._image.height()
+        return self._height
 
 
 class Canvas(QFrame):
