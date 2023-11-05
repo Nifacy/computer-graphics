@@ -89,8 +89,8 @@ private:
             return false;
         }
 
-        if (z > __zbuffer[x][y]) {
-            __zbuffer[x][y] = z;
+        if (z > __zbuffer[y][x]) {
+            __zbuffer[y][x] = z;
             return true;
         }
 
@@ -101,14 +101,14 @@ public:
     Viewport(Canvas & canvas) : 
         __zbuffer(canvas.size(), vector<SceneCoordinate>(canvas[0].size(), 0.0f)),
         __canvas(canvas),
-        __center { -static_cast<int>(canvas.size()) / 2, -static_cast<int>(canvas[0].size()) / 2 },
-        __size { static_cast<int>(canvas.size()), static_cast<int>(canvas.size()) }
+        __center { -static_cast<int>(canvas[0].size()) / 2, -static_cast<int>(canvas.size()) / 2 },
+        __size { static_cast<int>(canvas[0].size()), static_cast<int>(canvas.size()) }
     { }
 
     void PutPixel(const CanvasPoint& point, SceneCoordinate z, const Color& color) {
         if (CanBeChanged(point, z)) {
             CanvasCoordinate x = point.x - __center.x, y = point.y - __center.y;
-            __canvas[x][__size.y - y] = color;
+            __canvas[__size.y - y - 1][x] = color;
         }
     }
 
@@ -281,7 +281,7 @@ private:
         }
         CanvasCoordinate canvasSize[] { viewport.Width(), viewport.Height() };
         pair<CanvasPoint, SceneCoordinate> points[3];
-        
+
         for (int i = 0; i < 3; i++) {
             points[i] = {
                 ProjectPoint(canvasSize, triangle.points[i]),
@@ -390,9 +390,9 @@ public:
 };
 
 void PrintCanvas(const Canvas & canvas) {
-    for (size_t j = 0; j < canvas[0].size(); j++) {
-        for (size_t i = 0; i < canvas.size(); i++) {
-            const Color& color = canvas[i][j];
+    for (size_t j = 0; j < canvas.size(); j++) {
+        for (size_t i = 0; i < canvas[j].size(); i++) {
+            const Color& color = canvas[j][i];
             cout.write(reinterpret_cast<const char*>(&(color.r)), sizeof(color.r));
             cout.write(reinterpret_cast<const char*>(&(color.g)), sizeof(color.g));
             cout.write(reinterpret_cast<const char*>(&(color.b)), sizeof(color.b));
@@ -451,7 +451,7 @@ int main() {
     cin.tie(0);
     cout.tie(0);
 
-    while (true) {
+    while (!cin.eof()) {
         Config config;
         CanvasCoordinate width, height;
         vector<Triangle> triangles;
@@ -461,7 +461,7 @@ int main() {
         ReadTriangles(triangles);
 
         Renderer renderer(config);
-        Canvas canvas(width, vector<Color>(height));
+        Canvas canvas(height, vector<Color>(width));
 
         renderer.Render(canvas, triangles);
         PrintCanvas(canvas);

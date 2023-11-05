@@ -1,13 +1,12 @@
 import sys
-
 import numpy as np
 
 import engine.renderer as renderer
 
 from PyQt5.QtCore import QSize, Qt
-from PyQt5.QtGui import QPainter, QMouseEvent, QPaintEvent, QWheelEvent, QImage, QColor
+from PyQt5.QtGui import QPainter, QMouseEvent, QPaintEvent, QWheelEvent, QResizeEvent, QImage, QColor
 from PyQt5.QtWidgets import QApplication, QFrame
-from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import QWidget, QVBoxLayout
 
 from engine import model, renderer, models, scene
 
@@ -92,7 +91,8 @@ class UserScaleAction:
 class Canvas(QFrame):
     def __init__(self, parent: QWidget | None) -> None:
         super().__init__(parent)
-        self.setFixedSize(QSize(400, 400))
+        self.setMinimumSize(QSize(400, 400))
+        self.setStyleSheet('background-color: #000000')
 
         self._pyramid = scene.GameObject(
             scale=2,
@@ -100,13 +100,15 @@ class Canvas(QFrame):
             position=models.Point(0, 0, 5),
             mesh=model.load('./models/pyramid.obj'),
         )
-        
-        self._renderer = renderer.Renderer(renderer.Config(
+
+        self._render_config = renderer.Config(
             d=1,
             view_size=(1.0, 1.0),
             mode=renderer.RenderMode.FILL,
             projection=renderer.ProjectionType.PERSPECTIVE,
-        ))
+        )
+
+        self._renderer = renderer.Renderer(self._render_config)
 
         self._move_handler = UserMoveActionHandler(self._pyramid)
         self._rotate_handler = UserRotateActionHandler(self._pyramid)
@@ -147,16 +149,21 @@ class Canvas(QFrame):
         direction = [-1, 1][event.angleDelta().y() >= 0]
         self._scale_handler.update(direction)
 
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        self._render_config.view_size = (1.0, event.size().height() / event.size().width())
 
 
 class MainWindow(QWidget):
     def __init__(self) -> None:
         super().__init__()
-        self.setFixedSize(QSize(400, 400))
-        self.__init_widgets()
+        self.setMinimumSize(QSize(400, 400))
 
-    def __init_widgets(self):
-        self.__canvas = Canvas(self)
+        self.__layout = QVBoxLayout()
+        self.__init_widgets(self.__layout)
+        self.setLayout(self.__layout)
+
+    def __init_widgets(self, layout: QVBoxLayout) -> None:
+        layout.addWidget(Canvas(self), 1)
 
 
 def main():

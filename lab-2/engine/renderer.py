@@ -107,7 +107,7 @@ class Renderer:
         self._process.stdin.flush()
 
         output = self._process.stdout.readline().strip()
-        pixels = numpy.frombuffer(output, dtype=numpy.uint8).reshape((*canvas_size, 4))
+        pixels = numpy.frombuffer(output, dtype=numpy.uint8).reshape((*canvas_size[::-1], 4))
         viewport.update(pixels)
 
     def __del__(self) -> None:
