@@ -56,7 +56,7 @@ def _run_renderer():
 class Renderer:
     def __init__(self, config: Config) -> None:
         self._config = config
-        
+
         _build_renderer()
         self._process = _run_renderer()
 
@@ -66,7 +66,7 @@ class Renderer:
             view_width=self._config.view_size[0],
             view_height=self._config.view_size[1],
             render_mode=self._config.mode.value,
-            projection_type=self._config.mode.value,
+            projection_type=self._config.projection.value,
         )
 
     @classmethod
