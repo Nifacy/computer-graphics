@@ -174,7 +174,6 @@ private:
     }
 
     void Interpolate(int i0, float d0, int i1, float d1, vector<float>& values) {
-        
         if (i0 == i1) {
             values.push_back(d0);
             return;
@@ -353,8 +352,8 @@ private:
             DrawFilledTriangleImpl(viewport, { {a2, b, c}, triangle.color });
 
         } else if (IsOutOfVisibleRange(b)) {
-            Vector3 b1 = CutLine({a, b}).begin;
-            Vector3 b2 = CutLine({b, c}).end;
+            Vector3 b1 = CutLine({a, b}).end;
+            Vector3 b2 = CutLine({b, c}).begin;
             DrawFilledTriangleImpl(viewport, { {a, b1, c}, triangle.color });
             DrawFilledTriangleImpl(viewport, { {a, b2, c}, triangle.color });
         
