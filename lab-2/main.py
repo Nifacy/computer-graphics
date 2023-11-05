@@ -1,12 +1,13 @@
+import math
 import sys
 import numpy as np
 
 import engine.renderer as renderer
 
 from PyQt5.QtCore import QSize, Qt
-from PyQt5.QtGui import QPainter, QMouseEvent, QPaintEvent, QWheelEvent, QResizeEvent, QImage, QColor
-from PyQt5.QtWidgets import QApplication, QFrame
-from PyQt5.QtWidgets import QWidget, QVBoxLayout
+from PyQt5.QtGui import QPainter, QMouseEvent, QPaintEvent, QWheelEvent, QResizeEvent, QImage, QColor, QFont
+from PyQt5.QtWidgets import QApplication, QWidget, QFrame, QVBoxLayout, QHBoxLayout
+from PyQt5.QtWidgets import QDoubleSpinBox, QComboBox, QLabel, QSpacerItem, QSizePolicy
 
 from engine import model, renderer, models, scene
 
@@ -88,25 +89,210 @@ class UserScaleAction:
         self._obj.scale = max(new_scale, 0.0)
 
 
+class SettingsWidget(QWidget):
+    _RENDER_MODE = {
+        'Каркасная': renderer.RenderMode.WIREFRAME,
+        'Заливка': renderer.RenderMode.FILL,
+    }
+
+    _PROJECTION_TYPE = {
+        'Изометрия': renderer.ProjectionType.ISOMETRIC,
+        'Перспектива': renderer.ProjectionType.PERSPECTIVE,
+    }
+
+    class _Spinbox(QDoubleSpinBox):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.__edit_lock = False
+            self.valueChanged.connect(self.__notify_about_changes)
+            self._on_change_subscribers = []
+
+        def setValue(self, val: float) -> None:
+            if not self.__edit_lock:
+                super().setValue(val)
+
+        def focusInEvent(self, event):
+            super().focusInEvent(event)
+            self.__edit_lock = True
+
+        def focusOutEvent(self, event):
+            super().focusOutEvent(event)
+            self.__edit_lock = False
+
+        def __notify_about_changes(self):
+            if not self.__edit_lock:
+                return
+
+            for subscriber in self._on_change_subscribers:
+                subscriber(self.value())
+
+        def on_change(self, subscriber):
+            if subscriber not in self._on_change_subscribers:
+                self._on_change_subscribers.append(subscriber)
+
+    def __init__(self, config: renderer.Config, object: scene.GameObject):
+        super().__init__()
+        self.__config = config
+        self.__object = object
+
+        main_layout = QVBoxLayout()
+        self.__init_widgets(main_layout)
+        self.setLayout(main_layout)
+
+    def __create_double_spin_box(self, start: float, end: float | None, default: float):
+        spinbox = self._Spinbox()
+        spinbox.setDecimals(2)
+        spinbox.setMinimum(start)
+
+        spinbox.setMaximum(end or float('inf'))
+
+        spinbox.setSingleStep(0.01)
+        spinbox.setValue(default)
+        spinbox.setFixedWidth(100)
+
+        spinbox.on_change(lambda _: self._on_change())
+
+        return spinbox
+
+    def __create_combo_box(self, options: list[str], default: str):
+        combo_box = QComboBox()
+        combo_box.addItems(options)
+        combo_box.setCurrentText(default)
+        combo_box.setFixedWidth(100)
+
+        combo_box.currentTextChanged.connect(lambda: self._on_change())
+
+        return combo_box
+
+    def __create_param_field(self, path: str, name: str, widget: QWidget):
+        param_layout = QHBoxLayout()
+        param_layout.addWidget(QLabel(name), 0)
+        param_layout.addWidget(widget, 1)
+        return param_layout, [{'path': path, 'widget': widget}]
+
+    def __create_param_block(self, path, name, fields):
+        param_block_layout = QVBoxLayout()
+        label = QLabel(name)
+        font = QFont()
+        font.setBold(True)
+        font.setPointSize(10)
+        label.setFont(font)
+        param_block_layout.addWidget(label, 0)
+        children_info = []
+
+        for layout, child_widgets_info in fields:
+            param_block_layout.addLayout(layout, 1)
+
+            for widget_info in child_widgets_info:
+                children_info.append({
+                    'path': f'{path}.{widget_info['path']}',
+                    'widget': widget_info['widget'],
+                })
+
+        return param_block_layout, children_info
+
+    def _on_change(self):
+        self.__object.position = models.Point(
+            self._widgets_map['position.x'].value(),
+            self._widgets_map['position.y'].value(),
+            self._widgets_map['position.z'].value(),
+        )
+
+        self.__object.rotation = models.Point(
+            self._widgets_map['rotation.x'].value(),
+            self._widgets_map['rotation.y'].value(),
+            self._widgets_map['rotation.z'].value(),
+        )
+
+        self.__config.mode = self._RENDER_MODE[self._widgets_map['render_mode'].currentText()]
+        self.__config.projection = self._PROJECTION_TYPE[self._widgets_map['projection'].currentText()]
+
+    def _normalize(self, angle: float) -> float:
+        while not (0 <= angle <= 2 * math.pi):
+            if angle < 0: angle += 2 * math.pi
+            else: angle -= 2 * math.pi
+        return angle
+
+    def paintEvent(self, event: QPaintEvent) -> None:
+        self._widgets_map['position.x'].setValue(self.__object.position.x)
+        self._widgets_map['position.y'].setValue(self.__object.position.y)
+        self._widgets_map['position.z'].setValue(self.__object.position.z)
+
+        self._widgets_map['rotation.x'].setValue(self._normalize(self.__object.rotation.x))
+        self._widgets_map['rotation.y'].setValue(self._normalize(self.__object.rotation.y))
+        self._widgets_map['rotation.z'].setValue(self._normalize(self.__object.rotation.z))
+
+        self.update()
+
+    def __init_widgets(self, layout: QVBoxLayout):
+        self._widgets_map = dict()
+
+        d = [
+            self.__create_param_block(
+                'position', 'Координаты',
+                [
+                    self.__create_param_field(
+                        'x', 'x',
+                        self.__create_double_spin_box(-10, 10, 0)
+                    ),
+                    self.__create_param_field(
+                        'y', 'y',
+                        self.__create_double_spin_box(-10, 10, 0)
+                    ),
+                    self.__create_param_field(
+                        'z', 'z',
+                        self.__create_double_spin_box(-10, 10, 5)
+                    ),
+                ]
+            ),
+
+            self.__create_param_block(
+                'rotation', 'Поворот',
+                [
+                    self.__create_param_field(
+                        'x', 'x',
+                        self.__create_double_spin_box(0, 2 * math.pi, 0)
+                    ),
+                    self.__create_param_field(
+                        'y', 'y',
+                        self.__create_double_spin_box(0, 2 * math.pi, 0)
+                    ),
+                    self.__create_param_field(
+                        'z', 'z',
+                        self.__create_double_spin_box(0, 2 * math.pi, 0)
+                    ),
+                ]
+            ),
+
+            self.__create_param_field(
+                'render_mode', 'Режим рендеринга:',
+                self.__create_combo_box(['Каркасная', 'Заливка'], 'Заливка')
+            ),
+
+            self.__create_param_field(
+                'projection', 'Проекция:',
+                self.__create_combo_box(['Перспектива', 'Изометрия'], 'Перспектива')
+            ),
+        ]
+
+        for param_layout, widgets_info in d:
+            layout.addLayout(param_layout)
+            for widget_info in widgets_info:
+                self._widgets_map[widget_info['path']] = widget_info['widget']
+
+        print(self._widgets_map)
+        layout.addItem(QSpacerItem(200, 1000, QSizePolicy.Minimum, QSizePolicy.Expanding))
+
+
+
 class Canvas(QFrame):
-    def __init__(self, parent: QWidget | None) -> None:
+    def __init__(self, parent: QWidget, render_config: renderer.Config, object: scene.GameObject) -> None:
         super().__init__(parent)
         self.setMinimumSize(QSize(400, 400))
         self.setStyleSheet('background-color: #000000')
 
-        self._pyramid = scene.GameObject(
-            scale=2,
-            rotation=models.Point(0, 0, 0),
-            position=models.Point(0, 0, 5),
-            mesh=model.load('./models/pyramid.obj'),
-        )
-
-        self._render_config = renderer.Config(
-            d=1,
-            view_size=(1.0, 1.0),
-            mode=renderer.RenderMode.FILL,
-            projection=renderer.ProjectionType.PERSPECTIVE,
-        )
+        self._pyramid = object
+        self._render_config = render_config
 
         self._renderer = renderer.Renderer(self._render_config)
 
@@ -158,12 +344,31 @@ class MainWindow(QWidget):
         super().__init__()
         self.setMinimumSize(QSize(400, 400))
 
+        self.__render_config = renderer.Config(
+            d=1,
+            view_size=(1.0, 1.0),
+            mode=renderer.RenderMode.FILL,
+            projection=renderer.ProjectionType.PERSPECTIVE,
+        )
+
+        self.__object = scene.GameObject(
+            scale=1,
+            rotation=models.Point(0, 0, 0),
+            position=models.Point(0, 0, 5),
+            mesh=model.load('./models/pyramid.obj'),
+        )
+
         self.__layout = QVBoxLayout()
         self.__init_widgets(self.__layout)
         self.setLayout(self.__layout)
 
     def __init_widgets(self, layout: QVBoxLayout) -> None:
-        layout.addWidget(Canvas(self), 1)
+        canvas_with_settings_layout = QHBoxLayout()
+
+        canvas_with_settings_layout.addWidget(SettingsWidget(self.__render_config, self.__object), 0)
+        canvas_with_settings_layout.addWidget(Canvas(self, self.__render_config, self.__object), 1)
+
+        layout.addLayout(canvas_with_settings_layout)
 
 
 def main():
