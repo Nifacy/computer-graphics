@@ -185,7 +185,7 @@ class SettingsWidget(QWidget):
 
             for widget_info in child_widgets_info:
                 children_info.append({
-                    'path': f'{path}.{widget_info['path']}',
+                    'path': f'{path}.{widget_info["path"]}',
                     'widget': widget_info['widget'],
                 })
 
