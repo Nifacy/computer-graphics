@@ -6,7 +6,7 @@ import subprocess as sp
 
 import numpy
 
-from . import models
+from . import models, scene
 
 
 CURRENT_DIRECTORY_PATH = Path('.').absolute()
@@ -92,16 +92,43 @@ class Renderer:
         for triangle in triangles:
             amount += 1
             data += cls._serialize_triangle(triangle) + '\n\n'
-        
-        return f'{amount}\n' + data
 
-    def render(self, viewport: IViewport, triangles: list[models.Triangle]) -> None:
+        return f'{amount}\n{data}'
+
+    @classmethod
+    def _serialize_light(cls, light: scene.Light) -> str:
+        if isinstance(light, scene.AmbientLight):
+            return f'ambient\n{light.intensity}'
+
+        if isinstance(light, scene.PointLight):
+            return f'point\n{light.intensity}\n{light.position.x} {light.position.y} {light.position.z}'
+
+        if isinstance(light, scene.DirectionalLight):
+            return f'directional\n{light.intensity}\n{light.direction.x} {light.direction.y} {light.direction.z}'
+
+    @classmethod
+    def _serialize_lights(cls, lights: Iterable[scene.Light]) -> str:
+        data = ''
+        amount = 0
+
+        for light in lights:
+            amount += 1
+            data += cls._serialize_light(light) + '\n\n'
+
+        return f'{amount}\n{data}'
+
+    def render(
+            self,
+            viewport: IViewport,
+            triangles: list[models.Triangle],
+            lights: Iterable[scene.Light]) -> None:
         canvas_size = (viewport.width(), viewport.height())
         
-        data = '{config}\n{canvas_size}\n0\n{triangles}'.format(
+        data = '{config}\n{canvas_size}\n{lights}\n{triangles}'.format(
             config=self._serialize_config(),
             canvas_size=self._serialize_canvas_size(canvas_size),
-            triangles=self._serialize_triangles(triangles)
+            lights=self._serialize_lights(lights),
+            triangles=self._serialize_triangles(triangles),
         )
 
         self._process.stdin.write(data.encode())

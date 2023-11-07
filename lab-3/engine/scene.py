@@ -1,5 +1,6 @@
 from itertools import starmap
 from typing import Iterable, Iterator
+from dataclasses import dataclass
 import numpy
 
 from . import models
@@ -73,3 +74,23 @@ class GameObject:
         triangles = self._rotate(triangles)
         triangles = self._translate(triangles)
         return models.Mesh(triangles)
+
+
+@dataclass
+class Light:
+    intensity: float
+
+
+@dataclass
+class AmbientLight(Light):
+    pass
+
+
+@dataclass
+class PointLight(Light):
+    position: models.Point
+
+
+@dataclass
+class DirectionalLight(Light):
+    direction: models.Point
