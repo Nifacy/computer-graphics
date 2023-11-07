@@ -98,15 +98,11 @@ class Renderer:
     def render(self, viewport: IViewport, triangles: list[models.Triangle]) -> None:
         canvas_size = (viewport.width(), viewport.height())
         
-        data = '{config}\n{canvas_size}\n{triangles}'.format(
+        data = '{config}\n{canvas_size}\n0\n{triangles}'.format(
             config=self._serialize_config(),
             canvas_size=self._serialize_canvas_size(canvas_size),
             triangles=self._serialize_triangles(triangles)
         )
-
-        print('Input data:')
-        print(data)
-        return
 
         self._process.stdin.write(data.encode())
         self._process.stdin.flush()

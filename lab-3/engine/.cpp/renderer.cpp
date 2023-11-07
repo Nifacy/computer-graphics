@@ -3,6 +3,7 @@
 #include <vector>
 #include <tuple>
 #include <cmath>
+#include <memory>
 
 using namespace std;
 
@@ -484,6 +485,41 @@ void ReadConfig(Config& config) {
     }
 }
 
+
+void ReadLights(vector<shared_ptr<Light>>& lights) {
+    size_t lightObjectAmount;
+    string type;
+
+    cin >> lightObjectAmount;
+
+    while (lightObjectAmount > 0) {
+        cin >> type;
+
+        if (type == "ambient") {
+            double intensity;
+            cin >> intensity;
+            lights.push_back(make_shared<AmbientLight>(intensity));
+        }
+
+        else if (type == "point") {
+            double intensity;
+            Vector3 position;
+            cin >> intensity >> position.x >> position.y >> position.z;
+            lights.push_back(make_shared<PointLight>(intensity, position));
+        }
+
+        else if (type == "directional") {
+            double intensity;
+            Vector3 direction;
+            cin >> intensity >> direction.x >> direction.y >> direction.z;
+            lights.push_back(make_shared<DirectionalLight>(intensity, direction));
+        }
+
+        lightObjectAmount--;
+    }
+}
+
+
 void ReadTriangles(vector<Triangle>& triangles) {
     int trianglesAmount;
     int r, g, b;
@@ -506,6 +542,7 @@ void ReadTriangles(vector<Triangle>& triangles) {
     }
 }
 
+
 int main() {
     ios_base::sync_with_stdio(false);
     cin.tie(0);
@@ -515,9 +552,12 @@ int main() {
         Config config;
         CanvasCoordinate width, height;
         vector<Triangle> triangles;
+        vector<shared_ptr<Light>> lights;
 
         ReadConfig(config);
         cin >> width >> height;
+
+        ReadLights(lights);
         ReadTriangles(triangles);
 
         Renderer renderer(config);
