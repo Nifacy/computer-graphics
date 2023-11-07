@@ -9,7 +9,8 @@ import numpy
 from . import models
 
 
-CURRENT_FILE_PATH = Path(__file__).parent.absolute()
+CURRENT_DIRECTORY_PATH = Path('.').absolute()
+CURRENT_FILE_PATH = Path(__file__).parent.absolute().relative_to(CURRENT_DIRECTORY_PATH)
 SOURCE_FILE_PATH = CURRENT_FILE_PATH / Path('.cpp/renderer.cpp')
 BINARIES_PATH = CURRENT_FILE_PATH / Path('.bin/renderer')
 
@@ -102,6 +103,10 @@ class Renderer:
             canvas_size=self._serialize_canvas_size(canvas_size),
             triangles=self._serialize_triangles(triangles)
         )
+
+        print('Input data:')
+        print(data)
+        return
 
         self._process.stdin.write(data.encode())
         self._process.stdin.flush()
