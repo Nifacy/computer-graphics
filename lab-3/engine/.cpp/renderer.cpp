@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <vector>
 #include <tuple>
+#include <cmath>
 
 using namespace std;
 
@@ -52,6 +53,10 @@ struct Vector3 {
     SceneCoordinate Dot(const Vector3& other) const {
         return x * other.x + y * other.y + z * other.z;
     }
+
+    float Length() const {
+        return sqrt(x * x + y * y + z * z);
+    }
 };
 
 
@@ -72,6 +77,62 @@ struct Line {
 struct Triangle {
     Vector3 points[3] = { {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
     Color color = {0, 0, 0, 0};
+};
+
+
+class Light {
+public:
+    float intensity;
+    Light(float intensity) : intensity(intensity) {}
+
+    virtual double ComputeIntensity(const Vector3& P, const Vector3& N, const Vector3& V, double s) = 0;
+};
+
+
+class AmbientLight : public Light {
+public:
+    AmbientLight(double intensity) : Light(intensity) {}
+
+    double ComputeIntensity(const Vector3& P, const Vector3& N, const Vector3& V, double s) override {
+        return 1.0;
+    }
+};
+
+
+class PointLight : public Light {
+public:
+    Vector3 position;
+    PointLight(double intensity, const Vector3& position) : Light(intensity), position(position)
+    {}
+
+    double ComputeIntensity(const Vector3& P, const Vector3& N, const Vector3& V, double s) override {
+        Vector3 L = position - P;
+        double n_dot_l = N.Dot(L);
+
+        if (n_dot_l > 0) {
+            return n_dot_l / (N.Length() * L.Length());
+        }
+
+        return 0.0;
+    }
+};
+
+
+class DirectionalLight : public Light {
+public:
+    Vector3 direction;
+    DirectionalLight(double intensity, const Vector3& direction) : Light(intensity), direction(direction)
+    {}
+
+    double ComputeIntensity(const Vector3& P, const Vector3& N, const Vector3& V, double s) override {
+        double n_dot_l = N.Dot(direction);
+
+        if (n_dot_l > 0) {
+            return intensity * n_dot_l / (N.Length() * direction.Length());
+        }
+
+        return 0.0;
+    }
 };
 
 
