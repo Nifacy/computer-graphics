@@ -87,7 +87,7 @@ public:
     float intensity;
     Light(float intensity) : intensity(intensity) {}
 
-    virtual float ComputeIntensity(const Vector3& P, const Vector3& N) = 0;
+    virtual float ComputeIntensity(const Vector3& P, const Vector3& N, float specular) = 0;
 };
 
 
@@ -95,7 +95,7 @@ class AmbientLight : public Light {
 public:
     AmbientLight(double intensity) : Light(intensity) {}
 
-    float ComputeIntensity(const Vector3& P, const Vector3& N) override {
+    float ComputeIntensity(const Vector3& P, const Vector3& N, float specular) override {
         return 1.0;
     }
 };
@@ -107,15 +107,26 @@ public:
     PointLight(double intensity, const Vector3& position) : Light(intensity), position(position)
     {}
 
-    float ComputeIntensity(const Vector3& P, const Vector3& N) override {
-        Vector3 L = position - P;
-        double n_dot_l = N.Dot(L);
+    float ComputeIntensity(const Vector3& P, const Vector3& N, float specular) override {
+        Vector3 L = P - position;
+        float n_dot_l = N.Dot(L);
+        float result = 0.0;
+        float x = 0.0;
 
         if (n_dot_l > 0) {
-            return n_dot_l / (N.Length() * L.Length());
+            result += n_dot_l / (N.Length() * L.Length());
         }
 
-        return 0.0;
+        if (specular != 0.0) {
+            Vector3 R = N * 2 * N.Dot(L) - L;
+            float r_dot_v = R.Dot(P * (-1));
+
+            if (r_dot_v > 0.0) {
+                result += pow(r_dot_v / (R.Length() * P.Length()), specular);
+            }
+        }
+
+        return result;
     }
 };
 
@@ -126,11 +137,21 @@ public:
     DirectionalLight(double intensity, const Vector3& direction) : Light(intensity), direction(direction)
     {}
 
-    float ComputeIntensity(const Vector3& P, const Vector3& N) override {
-        double n_dot_l = N.Dot(direction);
+    float ComputeIntensity(const Vector3& P, const Vector3& N, float specular) override {
+        float n_dot_l = N.Dot(direction);
+        float result = 0.0;
 
         if (n_dot_l > 0) {
-            return intensity * n_dot_l / (N.Length() * direction.Length());
+            result += intensity * n_dot_l / (N.Length() * direction.Length());
+        }
+
+        if (specular != 0.0) {
+            Vector3 R = N * 2 * N.Dot(direction) - direction;
+            float r_dot_v = R.Dot(P * (-1));
+
+            if (r_dot_v > 0.0) {
+                result += pow(r_dot_v / (R.Length() * P.Length()), specular);
+            }
         }
 
         return 0.0;
@@ -337,11 +358,17 @@ private:
         DrawLine(viewport, { triangle.points[2], triangle.points[0] }, triangle.color);
     }
 
-    float ComputeLighting(const Vector3& p, const Vector3& n, const vector<shared_ptr<Light>>& lights) {
+    float ComputeLighting(
+        const Vector3& p,
+        const Vector3& n,
+        const vector<shared_ptr<Light>>& lights,
+        float specular
+    ) {
         float totalIntensity = 0.0;
 
         for(const shared_ptr<Light>& light : lights) {
-            totalIntensity += light->ComputeIntensity(p, n) * light->intensity;
+            float intensityCoef = light->ComputeIntensity(p, n, specular);
+            totalIntensity += intensityCoef * light->intensity;
         }
 
         return totalIntensity;
@@ -361,12 +388,12 @@ private:
         Vector3 n = v.Cross(w);
         Vector3 p = (triangle.points[0] + triangle.points[1] + triangle.points[2]) * (1.0f / 3.0f);
 
-        float lighting = ComputeLighting(p, n, lights);
+        float lighting = ComputeLighting(p, n, lights, triangle.specular);
 
         Color color {
-            (unsigned char) (triangle.color.r * lighting),
-            (unsigned char) (triangle.color.g * lighting),
-            (unsigned char) (triangle.color.b * lighting),
+            (unsigned char) min(255.0f, triangle.color.r * lighting),
+            (unsigned char) min(255.0f, triangle.color.g * lighting),
+            (unsigned char) min(255.0f, triangle.color.b * lighting),
             triangle.color.a
         };
 

@@ -22,13 +22,15 @@ class GameObject:
                     triangle.points[2] + self.position,
                 ),
                 triangle.color,
+                triangle.specular,
             )
 
     def _scale(self, triangles: Iterable[models.Triangle]) -> Iterator[models.Triangle]:
         for triangle in triangles:
             yield models.Triangle(
                 points=tuple(map(lambda p: p * self.scale, triangle.points)),
-                color=triangle.color
+                color=triangle.color,
+                specular=triangle.specular,
             )
 
     def _get_matrix(self, index: int, angle: float) -> numpy.ndarray:
@@ -66,7 +68,7 @@ class GameObject:
 
                 points.append(models.Point(*pos))
 
-            yield models.Triangle(tuple(points), triangle.color)
+            yield models.Triangle(tuple(points), triangle.color, triangle.specular)
 
     def mesh(self) -> models.Mesh:
         triangles = iter(self._mesh)
