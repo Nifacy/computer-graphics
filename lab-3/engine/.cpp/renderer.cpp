@@ -109,7 +109,7 @@ public:
     {}
 
     float ComputeIntensity(const Vector3& P, const Vector3& N, float specular) override {
-        Vector3 L = P - position;
+        Vector3 L = position - P;
         float n_dot_l = N.Dot(L);
         float result = 0.0;
         float x = 0.0;
@@ -383,13 +383,6 @@ private:
         if (IsBackFacing(triangle)) {
             return;
         }
-
-        Vector3 v = triangle.points[1] - triangle.points[0];
-        Vector3 w = triangle.points[2] - triangle.points[0];
-        Vector3 n = v.Cross(w);
-        Vector3 p = (triangle.points[0] + triangle.points[1] + triangle.points[2]) * (1.0f / 3.0f);
-
-        float lighting = ComputeLighting(p, n, lights, triangle.specular);
 
         CanvasCoordinate canvasSize[] { viewport.Width(), viewport.Height() };
         tuple<CanvasPoint, SceneCoordinate, float> points[3];
