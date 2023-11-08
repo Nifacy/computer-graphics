@@ -391,30 +391,28 @@ private:
 
         float lighting = ComputeLighting(p, n, lights, triangle.specular);
 
-        Color color {
-            (unsigned char) min(255.0f, triangle.color.r * lighting),
-            (unsigned char) min(255.0f, triangle.color.g * lighting),
-            (unsigned char) min(255.0f, triangle.color.b * lighting),
-            triangle.color.a
-        };
-
         CanvasCoordinate canvasSize[] { viewport.Width(), viewport.Height() };
-        pair<CanvasPoint, SceneCoordinate> points[3];
+        tuple<CanvasPoint, SceneCoordinate, float> points[3];
 
         for (int i = 0; i < 3; i++) {
             points[i] = {
                 ProjectPoint(canvasSize, triangle.points[i]),
                 triangle.points[i].z,
+                ComputeLighting(
+                    triangle.points[i], triangle.normals[i],
+                    lights, triangle.specular
+                )
             };
         }
 
         sort(
             points, points + 3,
-            [] (auto a, auto b) { return a.first.y < b.first.y; }
+            [] (auto a, auto b) { return get<0>(a).y < get<0>(b).y; }
         );
 
-        CanvasPoint p0 = points[0].first, p1 = points[1].first, p2 = points[2].first;
-        float z0 = points[0].second, z1 = points[1].second, z2 = points[2].second;
+        CanvasPoint p0 = get<0>(points[0]), p1 = get<0>(points[1]), p2 = get<0>(points[2]);
+        float z0 = get<1>(points[0]), z1 = get<1>(points[1]), z2 = get<1>(points[2]);
+        float l0 = get<2>(points[0]), l1 = get<2>(points[1]), l2 = get<2>(points[2]);
 
         vector<float> x02, x012, x12;
         Interpolate(p0.y, p0.x, p2.y, p2.x, x02);
@@ -430,13 +428,36 @@ private:
         z012.pop_back();
         z012.insert(z012.end(), z12.begin(), z12.end());
 
+        vector<float> l02, l012, l12;
+        Interpolate(p0.y, l0, p2.y, l2, l02);
+        Interpolate(p0.y, l0, p1.y, l1, l012);
+        Interpolate(p1.y, l1, p2.y,  l2, l12);
+        l012.pop_back();
+        l012.insert(l012.end(), l12.begin(), l12.end());
+
         for (int i = 0; i <= (p2.y - p0.y); i++) {
             CanvasCoordinate x1 = x02[i], x2 = x012[i];
-            if (x2 < x1) swap(x1, x2);
-            vector<float> zs;
-            Interpolate(x1, z02[i], x2, z012[i], zs);
+            float l1 = l02[i], l2 = l012[i];
+            SceneCoordinate z1 = z02[i], z2 = z012[i];
+
+            if (x2 < x1) {
+                swap(x1, x2);
+                swap(l1, l2);
+                swap(z1, z2);
+            }
+
+            vector<float> zs, ls;
+            Interpolate(x1, z1, x2, z2, zs);
+            Interpolate(x1, l1, x2, l2, ls);
 
             for (int j = 0; j <= x2 - x1; j++) {
+                Color color {
+                    (unsigned char) min(255.0f, triangle.color.r * ls[j]),
+                    (unsigned char) min(255.0f, triangle.color.g * ls[j]),
+                    (unsigned char) min(255.0f, triangle.color.b * ls[j]),
+                    triangle.color.a
+                };
+
                 viewport.PutPixel(
                     { x1 + j, p0.y + i },
                     zs[j],
