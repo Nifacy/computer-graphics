@@ -42,6 +42,7 @@ class Color(NamedTuple):
 class Triangle(NamedTuple):
     points: tuple[Point, Point, Point]
     color: Color
+    specular: float = 0.0
 
 
 Mesh = NewType('Mesh', tuple[Triangle, ...])

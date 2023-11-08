@@ -77,7 +77,7 @@ class Renderer:
         for point in triangle.points:
             data += f'{point.x} {point.y} {point.z}\n'
 
-        data += f'{triangle.color.r} {triangle.color.g} {triangle.color.b}'
+        data += f'{triangle.color.r} {triangle.color.g} {triangle.color.b} {triangle.specular}'
         return data
 
     @classmethod

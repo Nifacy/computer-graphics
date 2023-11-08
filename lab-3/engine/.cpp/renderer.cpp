@@ -78,6 +78,7 @@ struct Line {
 struct Triangle {
     Vector3 points[3] = { {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
     Color color = {0, 0, 0, 0};
+    float specular = 0.0;
 };
 
 
@@ -572,6 +573,8 @@ void ReadTriangles(vector<Triangle>& triangles) {
             static_cast<unsigned char>(b),
             255
         };
+
+        cin >> triangle.specular;
     }
 }
 
