@@ -77,6 +77,7 @@ struct Line {
 
 struct Triangle {
     Vector3 points[3] = { {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
+    Vector3 normals[3] = { {0, 0, 0}, {0, 0, 0}, {0, 0, 0} };
     Color color = {0, 0, 0, 0};
     float specular = 0.0;
 };
@@ -456,35 +457,116 @@ private:
         if (IsOutOfVisibleRange(a) && IsOutOfVisibleRange(b)) {
             a = CutLine({a, c}).begin;
             b = CutLine({b, c}).begin;
-            DrawFilledTriangleImpl(viewport, { { a, b, c }, triangle.color }, lights);
+
+            DrawFilledTriangleImpl(
+                viewport,
+                {
+                    { a, b, c },
+                    { triangle.normals[0], triangle.normals[1], triangle.normals[2] },
+                    triangle.color 
+                },
+                lights
+            );
         
         } else if (IsOutOfVisibleRange(a) && IsOutOfVisibleRange(c)) {
             a = CutLine({a, b}).begin;
             c = CutLine({b, c}).end;
-            DrawFilledTriangleImpl(viewport, { { a, b, c }, triangle.color }, lights);
+
+            DrawFilledTriangleImpl(
+                viewport,
+                {
+                    { a, b, c },
+                    { triangle.normals[0], triangle.normals[1], triangle.normals[2]},
+                    triangle.color
+                },
+                lights
+            );
         
         } else if (IsOutOfVisibleRange(b) && IsOutOfVisibleRange(c)) {
             b = CutLine({a, b}).end;
             c = CutLine({a, c}).end;
-            DrawFilledTriangleImpl(viewport, { { a, b, c }, triangle.color }, lights);
+
+            DrawFilledTriangleImpl(
+                viewport,
+                {
+                    { a, b, c },
+                    { triangle.normals[0], triangle.normals[1], triangle.normals[2]},
+                    triangle.color 
+                },
+                lights
+            );
 
         } else if (IsOutOfVisibleRange(a)) {
             Vector3 a1 = CutLine({a, b}).begin;
             Vector3 a2 = CutLine({a, c}).begin;
-            DrawFilledTriangleImpl(viewport, { {a1, b, c}, triangle.color }, lights);
-            DrawFilledTriangleImpl(viewport, { {a2, b, c}, triangle.color }, lights);
+
+            DrawFilledTriangleImpl(
+                viewport,
+                {
+                    {a1, b, c},
+                    { triangle.normals[0], triangle.normals[1], triangle.normals[2]},
+                    triangle.color
+                },
+                lights
+            );
+
+            DrawFilledTriangleImpl(
+                viewport,
+                {
+                    {a2, b, c},
+                    { triangle.normals[0], triangle.normals[1], triangle.normals[2]},
+                    triangle.color
+                },
+                lights
+            );
 
         } else if (IsOutOfVisibleRange(b)) {
             Vector3 b1 = CutLine({a, b}).end;
             Vector3 b2 = CutLine({b, c}).begin;
-            DrawFilledTriangleImpl(viewport, { {a, b1, c}, triangle.color }, lights);
-            DrawFilledTriangleImpl(viewport, { {a, b2, c}, triangle.color }, lights);
+
+            DrawFilledTriangleImpl(
+                viewport,
+                {
+                    {a, b1, c},
+                    { triangle.normals[0], triangle.normals[1], triangle.normals[2]},
+                    triangle.color
+                },
+                lights
+            );
+
+            DrawFilledTriangleImpl(
+                viewport,
+                {
+                    {a, b2, c},
+                    { triangle.normals[0], triangle.normals[1], triangle.normals[2]},
+                    triangle.color
+                },
+                lights
+            );
         
         } else if (IsOutOfVisibleRange(c)) {
             Vector3 c1 = CutLine({a, c}).end;
             Vector3 c2 = CutLine({b, c}).end;
-            DrawFilledTriangleImpl(viewport, { {a, b, c1}, triangle.color }, lights);
-            DrawFilledTriangleImpl(viewport, { {a, b, c2}, triangle.color }, lights);
+
+            DrawFilledTriangleImpl(
+                viewport,
+                {
+                    {a, b, c1},
+                    { triangle.normals[0], triangle.normals[1], triangle.normals[2]},
+                    triangle.color
+                },
+                lights
+            );
+
+            DrawFilledTriangleImpl(
+                viewport,
+                {
+                    {a, b, c2},
+                    { triangle.normals[0], triangle.normals[1], triangle.normals[2]},
+                    triangle.color
+                },
+                lights
+            );
         
         } else {
             DrawFilledTriangleImpl(viewport, triangle, lights);
@@ -591,6 +673,10 @@ void ReadTriangles(vector<Triangle>& triangles) {
     for (Triangle& triangle : triangles) {
         for (Vector3& point : triangle.points) {
             cin >> point.x >> point.y >> point.z;
+        }
+
+        for (Vector3& normal : triangle.normals) {
+            cin >> normal.x >> normal.y >> normal.z;
         }
 
         cin >> r >> g >> b;

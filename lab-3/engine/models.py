@@ -41,6 +41,7 @@ class Color(NamedTuple):
 
 class Triangle(NamedTuple):
     points: tuple[Point, Point, Point]
+    normals: tuple[Point, Point, Point]
     color: Color
     specular: float = 0.0
 

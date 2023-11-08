@@ -7,6 +7,7 @@ def create_grid(w: float, h: float, step: float) -> list[models.Triangle]:
     triangles = []
 
     green = models.Color(0, 255, 0)
+    normal = models.Point(0, 0, -1)
     specular = 80.0
 
     for y in numpy.arange(-h/2, h/2 + step, step):
@@ -25,6 +26,7 @@ def create_grid(w: float, h: float, step: float) -> list[models.Triangle]:
                     dots[j][i + 1],
                     dots[j + 1][i],
                 ),
+                normals=(normal, normal, normal),
                 color=green,
                 specular=specular,
             ))
@@ -35,6 +37,7 @@ def create_grid(w: float, h: float, step: float) -> list[models.Triangle]:
                     dots[j][i + 1],
                     dots[j + 1][i + 1],
                 ),
+                normals=(normal, normal, normal),
                 color=green,
                 specular=specular,
             ))

@@ -21,6 +21,7 @@ class GameObject:
                     triangle.points[1] + self.position,
                     triangle.points[2] + self.position,
                 ),
+                triangle.normals,
                 triangle.color,
                 triangle.specular,
             )
@@ -29,6 +30,7 @@ class GameObject:
         for triangle in triangles:
             yield models.Triangle(
                 points=tuple(map(lambda p: p * self.scale, triangle.points)),
+                normals=triangle.normals,
                 color=triangle.color,
                 specular=triangle.specular,
             )
@@ -58,17 +60,20 @@ class GameObject:
     def _rotate(self, triangles: Iterable[models.Triangle]) -> Iterable[models.Triangle]:
         for triangle in triangles:
             points = []
+            normals = []
 
-            for point in triangle.points:
+            for normal, point in zip(triangle.normals, triangle.points):
                 pos = numpy.array(point, dtype=numpy.float16)
+                n = numpy.array(normal, dtype=numpy.float16)
 
                 for i, angle in enumerate(self.rotation):
                     rotation_matrix = self._get_matrix(i, angle)
                     pos = numpy.matmul(rotation_matrix, pos)
 
                 points.append(models.Point(*pos))
+                normals.append(models.Point(*n))
 
-            yield models.Triangle(tuple(points), triangle.color, triangle.specular)
+            yield models.Triangle(tuple(points), tuple(normals), triangle.color, triangle.specular)
 
     def mesh(self) -> models.Mesh:
         triangles = iter(self._mesh)

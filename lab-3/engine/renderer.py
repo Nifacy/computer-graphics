@@ -76,6 +76,9 @@ class Renderer:
 
         for point in triangle.points:
             data += f'{point.x} {point.y} {point.z}\n'
+        
+        for normal in triangle.normals:
+            data += f'{normal.x} {normal.y} {normal.z}\n'
 
         data += f'{triangle.color.r} {triangle.color.g} {triangle.color.b} {triangle.specular}'
         return data
