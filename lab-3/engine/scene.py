@@ -69,6 +69,7 @@ class GameObject:
                 for i, angle in enumerate(self.rotation):
                     rotation_matrix = self._get_matrix(i, angle)
                     pos = numpy.matmul(rotation_matrix, pos)
+                    n = numpy.matmul(rotation_matrix, n)
 
                 points.append(models.Point(*pos))
                 normals.append(models.Point(*n))
