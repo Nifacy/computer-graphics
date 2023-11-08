@@ -86,7 +86,7 @@ public:
     float intensity;
     Light(float intensity) : intensity(intensity) {}
 
-    virtual double ComputeIntensity(const Vector3& P, const Vector3& N, const Vector3& V, double s) = 0;
+    virtual float ComputeIntensity(const Vector3& P, const Vector3& N) = 0;
 };
 
 
@@ -94,7 +94,7 @@ class AmbientLight : public Light {
 public:
     AmbientLight(double intensity) : Light(intensity) {}
 
-    double ComputeIntensity(const Vector3& P, const Vector3& N, const Vector3& V, double s) override {
+    float ComputeIntensity(const Vector3& P, const Vector3& N) override {
         return 1.0;
     }
 };
@@ -106,7 +106,7 @@ public:
     PointLight(double intensity, const Vector3& position) : Light(intensity), position(position)
     {}
 
-    double ComputeIntensity(const Vector3& P, const Vector3& N, const Vector3& V, double s) override {
+    float ComputeIntensity(const Vector3& P, const Vector3& N) override {
         Vector3 L = position - P;
         double n_dot_l = N.Dot(L);
 
@@ -125,7 +125,7 @@ public:
     DirectionalLight(double intensity, const Vector3& direction) : Light(intensity), direction(direction)
     {}
 
-    double ComputeIntensity(const Vector3& P, const Vector3& N, const Vector3& V, double s) override {
+    float ComputeIntensity(const Vector3& P, const Vector3& N) override {
         double n_dot_l = N.Dot(direction);
 
         if (n_dot_l > 0) {
@@ -336,10 +336,39 @@ private:
         DrawLine(viewport, { triangle.points[2], triangle.points[0] }, triangle.color);
     }
 
-    void DrawFilledTriangleImpl(Viewport& viewport, const Triangle& triangle) {
+    float ComputeLighting(const Vector3& p, const Vector3& n, const vector<shared_ptr<Light>>& lights) {
+        float totalIntensity = 0.0;
+
+        for(const shared_ptr<Light>& light : lights) {
+            totalIntensity += light->ComputeIntensity(p, n) * light->intensity;
+        }
+
+        return totalIntensity;
+    }
+
+    void DrawFilledTriangleImpl(
+        Viewport& viewport,
+        const Triangle& triangle,
+        const vector<shared_ptr<Light>>& lights
+    ) {
         if (IsBackFacing(triangle)) {
             return;
         }
+
+        Vector3 v = triangle.points[1] - triangle.points[0];
+        Vector3 w = triangle.points[2] - triangle.points[0];
+        Vector3 n = v.Cross(w);
+        Vector3 p = (triangle.points[0] + triangle.points[1] + triangle.points[2]) * (1.0f / 3.0f);
+
+        float lighting = ComputeLighting(p, n, lights);
+
+        Color color {
+            (unsigned char) (triangle.color.r * lighting),
+            (unsigned char) (triangle.color.g * lighting),
+            (unsigned char) (triangle.color.b * lighting),
+            triangle.color.a
+        };
+
         CanvasCoordinate canvasSize[] { viewport.Width(), viewport.Height() };
         pair<CanvasPoint, SceneCoordinate> points[3];
 
@@ -382,51 +411,55 @@ private:
                 viewport.PutPixel(
                     { x1 + j, p0.y + i },
                     zs[j],
-                    triangle.color
+                    color
                 );
             }
         }
 
     }
 
-    void DrawFilledTriangle(Viewport& viewport, const Triangle& triangle) {
+    void DrawFilledTriangle(
+        Viewport& viewport,
+        const Triangle& triangle,
+        const vector<shared_ptr<Light>>& lights
+    ) {
         Vector3 a = triangle.points[0], b = triangle.points[1], c = triangle.points[2];
 
         if (IsOutOfVisibleRange(a) && IsOutOfVisibleRange(b)) {
             a = CutLine({a, c}).begin;
             b = CutLine({b, c}).begin;
-            DrawFilledTriangleImpl(viewport, { { a, b, c }, triangle.color });
+            DrawFilledTriangleImpl(viewport, { { a, b, c }, triangle.color }, lights);
         
         } else if (IsOutOfVisibleRange(a) && IsOutOfVisibleRange(c)) {
             a = CutLine({a, b}).begin;
             c = CutLine({b, c}).end;
-            DrawFilledTriangleImpl(viewport, { { a, b, c }, triangle.color });
+            DrawFilledTriangleImpl(viewport, { { a, b, c }, triangle.color }, lights);
         
         } else if (IsOutOfVisibleRange(b) && IsOutOfVisibleRange(c)) {
             b = CutLine({a, b}).end;
             c = CutLine({a, c}).end;
-            DrawFilledTriangleImpl(viewport, { { a, b, c }, triangle.color });
+            DrawFilledTriangleImpl(viewport, { { a, b, c }, triangle.color }, lights);
 
         } else if (IsOutOfVisibleRange(a)) {
             Vector3 a1 = CutLine({a, b}).begin;
             Vector3 a2 = CutLine({a, c}).begin;
-            DrawFilledTriangleImpl(viewport, { {a1, b, c}, triangle.color });
-            DrawFilledTriangleImpl(viewport, { {a2, b, c}, triangle.color });
+            DrawFilledTriangleImpl(viewport, { {a1, b, c}, triangle.color }, lights);
+            DrawFilledTriangleImpl(viewport, { {a2, b, c}, triangle.color }, lights);
 
         } else if (IsOutOfVisibleRange(b)) {
             Vector3 b1 = CutLine({a, b}).end;
             Vector3 b2 = CutLine({b, c}).begin;
-            DrawFilledTriangleImpl(viewport, { {a, b1, c}, triangle.color });
-            DrawFilledTriangleImpl(viewport, { {a, b2, c}, triangle.color });
+            DrawFilledTriangleImpl(viewport, { {a, b1, c}, triangle.color }, lights);
+            DrawFilledTriangleImpl(viewport, { {a, b2, c}, triangle.color }, lights);
         
         } else if (IsOutOfVisibleRange(c)) {
             Vector3 c1 = CutLine({a, c}).end;
             Vector3 c2 = CutLine({b, c}).end;
-            DrawFilledTriangleImpl(viewport, { {a, b, c1}, triangle.color });
-            DrawFilledTriangleImpl(viewport, { {a, b, c2}, triangle.color });
+            DrawFilledTriangleImpl(viewport, { {a, b, c1}, triangle.color }, lights);
+            DrawFilledTriangleImpl(viewport, { {a, b, c2}, triangle.color }, lights);
         
         } else {
-            DrawFilledTriangleImpl(viewport, triangle);
+            DrawFilledTriangleImpl(viewport, triangle, lights);
         }
     }
 
@@ -434,7 +467,7 @@ public:
     Renderer(const Config& config) : __config(config)
     { }
 
-    void Render(Canvas& canvas, const vector<Triangle>& triangles) {
+    void Render(Canvas& canvas, const vector<Triangle>& triangles, const vector<shared_ptr<Light>>& lights) {
         Viewport viewport(canvas);
         int i = 0;
 
@@ -443,7 +476,7 @@ public:
                 DrawBorderedTriangle(viewport, triangle);
             }
             else {
-                DrawFilledTriangle(viewport, triangle);
+                DrawFilledTriangle(viewport, triangle, lights);
             }
             i++;
         }
@@ -563,7 +596,7 @@ int main() {
         Renderer renderer(config);
         Canvas canvas(height, vector<Color>(width));
 
-        renderer.Render(canvas, triangles);
+        renderer.Render(canvas, triangles, lights);
         PrintCanvas(canvas);
     }
 
