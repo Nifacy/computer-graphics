@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QFrame, QVBoxLayout, QHBoxLay
 from PyQt5.QtWidgets import QDoubleSpinBox, QComboBox, QLabel, QSpacerItem, QSizePolicy
 
 from engine import model, renderer, models, scene
+from model_templates import cylinder
 
 
 class QImageViewport(renderer.IViewport):
@@ -308,7 +309,12 @@ class Canvas(QFrame):
         viewport = QImageViewport(self.size().width(), self.size().height())
 
         painter.begin(self)
-        self._renderer.render(viewport, self._pyramid.mesh())
+        self._renderer.render(viewport, self._pyramid.mesh(), [
+            scene.AmbientLight(0.2),
+            scene.PointLight(0.4, models.Point(1, 4, 0)),
+            scene.DirectionalLight(0.2, models.Point(1, 0, 0)),
+        ])
+
         painter.drawImage(0, 0, viewport.image)
         painter.end()
 
@@ -355,7 +361,7 @@ class MainWindow(QWidget):
             scale=1,
             rotation=models.Point(0, 0, 0),
             position=models.Point(0, 0, 5),
-            mesh=model.load('./models/pyramid.obj'),
+            mesh=cylinder(1.0, 2.0, 40, models.Color(0, 255, 0), 500.0),
         )
 
         self.__layout = QVBoxLayout()
