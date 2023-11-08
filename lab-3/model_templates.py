@@ -7,7 +7,7 @@ def create_grid(w: float, h: float, step: float) -> list[models.Triangle]:
     triangles = []
 
     green = models.Color(0, 255, 0)
-    normal = models.Point(0, 0, -1)
+    normal = models.Point(0, 0, 1)
     specular = 80.0
 
     for y in numpy.arange(-h/2, h/2 + step, step):
