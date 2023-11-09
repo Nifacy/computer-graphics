@@ -1,5 +1,6 @@
 import math
 import sys
+from typing import Iterable
 import numpy as np
 
 import engine.renderer as renderer
@@ -131,10 +132,11 @@ class SettingsWidget(QWidget):
             if subscriber not in self._on_change_subscribers:
                 self._on_change_subscribers.append(subscriber)
 
-    def __init__(self, config: renderer.Config, object: scene.GameObject):
+    def __init__(self, config: renderer.Config, object: scene.GameObject, lights: dict[str, scene.Light]):
         super().__init__()
         self.__config = config
         self.__object = object
+        self.__lights = lights
 
         main_layout = QVBoxLayout()
         self.__init_widgets(main_layout)
@@ -205,6 +207,20 @@ class SettingsWidget(QWidget):
             self._widgets_map['rotation.z'].value(),
         )
 
+        self.__lights['ambient'].intensity = self._widgets_map['ambient_light.intensity'].value()
+        self.__lights['point'].intensity = self._widgets_map['point_light.intensity'].value()
+        self.__lights['point'].position = models.Point(
+            self._widgets_map['point_light.x'].value(),
+            self._widgets_map['point_light.y'].value(),
+            self._widgets_map['point_light.z'].value(),
+        )
+        self.__lights['direction'].intensity = self._widgets_map['direction_light.intensity'].value()
+        self.__lights['direction'].direction = models.Point(
+            self._widgets_map['direction_light.x'].value(),
+            self._widgets_map['direction_light.y'].value(),
+            self._widgets_map['direction_light.z'].value(),
+        )
+
         self.__config.mode = self._RENDER_MODE[self._widgets_map['render_mode'].currentText()]
         self.__config.projection = self._PROJECTION_TYPE[self._widgets_map['projection'].currentText()]
 
@@ -229,6 +245,60 @@ class SettingsWidget(QWidget):
         self._widgets_map = dict()
 
         d = [
+            self.__create_param_block(
+                'point_light', 'Свет (точечный)',
+                [
+                    self.__create_param_field(
+                        'x', 'x',
+                        self.__create_double_spin_box(-10, 10, 0),
+                    ),
+                    self.__create_param_field(
+                        'y', 'y',
+                        self.__create_double_spin_box(-10, 10, 0),
+                    ),
+                    self.__create_param_field(
+                        'z', 'z',
+                        self.__create_double_spin_box(-10, 10, 0),
+                    ),
+                    self.__create_param_field(
+                        'intensity', 'Интенсивность',
+                        self.__create_double_spin_box(0, 2, 1),
+                    ),
+                ]
+            ),
+
+            self.__create_param_block(
+                'direction_light', 'Свет (направленный)',
+                [
+                    self.__create_param_field(
+                        'x', 'x',
+                        self.__create_double_spin_box(-10, 10, 0),
+                    ),
+                    self.__create_param_field(
+                        'y', 'y',
+                        self.__create_double_spin_box(-10, 10, 0),
+                    ),
+                    self.__create_param_field(
+                        'z', 'z',
+                        self.__create_double_spin_box(-10, 10, 0),
+                    ),
+                    self.__create_param_field(
+                        'intensity', 'Интенсивность',
+                        self.__create_double_spin_box(0, 2, 1),
+                    ),
+                ]
+            ),
+
+            self.__create_param_block(
+                'ambient_light', 'Свет (рассеянный)',
+                [
+                    self.__create_param_field(
+                        'intensity', 'Интенсивность',
+                        self.__create_double_spin_box(0, 2, 1),
+                    ),
+                ]
+            ),
+
             self.__create_param_block(
                 'position', 'Координаты',
                 [
@@ -287,12 +357,20 @@ class SettingsWidget(QWidget):
 
 
 class Canvas(QFrame):
-    def __init__(self, parent: QWidget, render_config: renderer.Config, object: scene.GameObject) -> None:
+    def __init__(
+            self,
+            parent: QWidget,
+            render_config: renderer.Config,
+            object: scene.GameObject,
+            lights: Iterable[scene.Light],
+    ) -> None:
         super().__init__(parent)
         self.setMinimumSize(QSize(400, 400))
         self.setStyleSheet('background-color: #000000')
 
         self._pyramid = object
+        self._lights = tuple(lights)
+
         self._render_config = render_config
 
         self._renderer = renderer.Renderer(self._render_config)
@@ -309,11 +387,7 @@ class Canvas(QFrame):
         viewport = QImageViewport(self.size().width(), self.size().height())
 
         painter.begin(self)
-        self._renderer.render(viewport, self._pyramid.mesh(), [
-            scene.AmbientLight(0.2),
-            scene.PointLight(0.4, models.Point(1, 4, 0)),
-            scene.DirectionalLight(0.2, models.Point(1, 0, 0)),
-        ])
+        self._renderer.render(viewport, self._pyramid.mesh(), self._lights)
 
         painter.drawImage(0, 0, viewport.image)
         painter.end()
@@ -364,6 +438,12 @@ class MainWindow(QWidget):
             mesh=cylinder(1.0, 2.0, 40, models.Color(0, 255, 0), 500.0),
         )
 
+        self.__lights = {
+            'ambient' : scene.AmbientLight(1.0),
+            'point': scene.PointLight(1.0, models.Point(0.0, 0.0, 0.0)),
+            'direction': scene.PointLight(0.0, models.Point(0.0, 0.0, 0.0)),
+        }
+
         self.__layout = QVBoxLayout()
         self.__init_widgets(self.__layout)
         self.setLayout(self.__layout)
@@ -371,8 +451,16 @@ class MainWindow(QWidget):
     def __init_widgets(self, layout: QVBoxLayout) -> None:
         canvas_with_settings_layout = QHBoxLayout()
 
-        canvas_with_settings_layout.addWidget(SettingsWidget(self.__render_config, self.__object), 0)
-        canvas_with_settings_layout.addWidget(Canvas(self, self.__render_config, self.__object), 1)
+        canvas_with_settings_layout.addWidget(SettingsWidget(
+            self.__render_config,
+            self.__object,
+            self.__lights,
+        ), 0)
+
+        canvas_with_settings_layout.addWidget(
+            Canvas(self, self.__render_config, self.__object, self.__lights.values()),
+            1,
+        )
 
         layout.addLayout(canvas_with_settings_layout)
 
