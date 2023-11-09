@@ -431,11 +431,12 @@ class MainWindow(QWidget):
             projection=renderer.ProjectionType.PERSPECTIVE,
         )
 
+        vertices_amount = int(input('Количество вершин: '))
         self.__object = scene.GameObject(
             scale=1,
             rotation=models.Point(0, 0, 0),
             position=models.Point(0, 0, 5),
-            mesh=cylinder(1.0, 2.0, 40, models.Color(0, 255, 0), 500.0),
+            mesh=cylinder(1.0, 2.0, vertices_amount, models.Color(0, 255, 0), 500.0),
         )
 
         self.__lights = {
