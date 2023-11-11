@@ -1,7 +1,7 @@
 import numpy
 
 from . import scene
-from .renderer import Config, CanvasSize, Renderer
+from ._renderer import Config, CanvasSize, Renderer, RenderMode, ProjectionType
 
 
 class Engine:

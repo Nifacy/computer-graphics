@@ -3,7 +3,8 @@ from typing import Iterable, NewType
 from dataclasses import dataclass
 import numpy as np
 
-from . import types, light
+from . import types
+from ._light import Light, AmbientLight, PointLight, DirectionalLight
 
 
 Mesh = NewType('Mesh', tuple[types.Triangle, ...])
@@ -88,14 +89,14 @@ class Scene:
         self._objects = []
         self._lights = []
     
-    def add_object(self, scene_object: SceneObject | light.Light) -> None:
+    def add_object(self, scene_object: SceneObject | Light) -> None:
         objects_container = self._objects if isinstance(scene_object, SceneObject) else self._lights
 
         if scene_object not in objects_container:
             objects_container.append(scene_object)
 
 
-def dump_scene(scene: Scene) -> tuple[tuple[types.Triangle, ...], tuple[light.Light, ...]]:
+def dump_scene(scene: Scene) -> tuple[tuple[types.Triangle, ...], tuple[Light, ...]]:
     lights = tuple(scene._lights)
     triangles = []
 
