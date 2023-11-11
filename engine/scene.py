@@ -94,6 +94,12 @@ class Scene:
 
         if scene_object not in objects_container:
             objects_container.append(scene_object)
+    
+    def get_by_name(self, name: str) -> SceneObject | None:
+        for obj in self._objects:
+            if obj.name == name:
+                return obj
+        return None
 
 
 def dump_scene(scene: Scene) -> tuple[tuple[types.Triangle, ...], tuple[Light, ...]]:
