@@ -5,7 +5,7 @@ from typing import Iterable
 import ctypes
 import numpy
 
-from . import types, scene, _bindings
+from . import types, light, _bindings
 
 class RenderMode(Enum):
     WIREFRAME = 1
@@ -48,7 +48,7 @@ class Renderer:
         self,
         canvas_size: CanvasSize,
         triangles: list[types.Triangle],
-        lights: Iterable[scene.Light],
+        lights: Iterable[light.Light],
     ) -> None:
         data = numpy.zeros((canvas_size.height, canvas_size.width, 4), dtype=numpy.uint8)
         raw_triangles = (_bindings.Triangle * len(triangles))(*map(lambda t: t.raw, triangles))
