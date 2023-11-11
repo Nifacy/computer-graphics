@@ -3,47 +3,17 @@ import sys
 from typing import Iterable
 import numpy as np
 
-import engine.renderer as renderer
-
 from PyQt5.QtCore import QSize, Qt
 from PyQt5.QtGui import QPainter, QMouseEvent, QPaintEvent, QWheelEvent, QResizeEvent, QImage, QColor, QFont
 from PyQt5.QtWidgets import QApplication, QWidget, QFrame, QVBoxLayout, QHBoxLayout
 from PyQt5.QtWidgets import QDoubleSpinBox, QComboBox, QLabel, QSpacerItem, QSizePolicy
 
-from engine import model, renderer, models, scene
+from engine import engine, types, scene
 from model_templates import cylinder
 
 
-class QImageViewport(renderer.IViewport):
-    def __init__(self, width: int, height: int) -> None:
-        self._image = self.__create_image(width, height)
-        self._width = width
-        self._height = height
-
-    @staticmethod
-    def __create_image(width: str, height: str) -> QImage:
-        image = QImage(QSize(width, height), QImage.Format_RGBA8888)
-        image.fill(QColor(255, 255, 255, 255))
-        return image
-
-    def update(self, data: np.ndarray) -> None:
-        bytesPerLine = 4 * self.width()
-        qimage = QImage(data.data, self.width(), self.height(), bytesPerLine, QImage.Format_RGBA8888)
-        self._image = qimage
-
-    @property
-    def image(self) -> QImage:
-        return self._image
-
-    def width(self) -> int:
-        return self._width
-    
-    def height(self) -> int:
-        return self._height
-
-
 class UserMoveActionHandler:
-    def __init__(self, obj: scene.GameObject):
+    def __init__(self, obj: scene.SceneObject):
         self._obj = obj
         self._start_position = None
         self._start_point = None
@@ -55,7 +25,7 @@ class UserMoveActionHandler:
     def update(self, point: tuple[int, int]) -> None:
         if self._start_point is None:
             return
-        delta = models.Point(point[0] - self._start_point[0], self._start_point[1] - point[1], 0)
+        delta = types.Vector3(point[0] - self._start_point[0], self._start_point[1] - point[1], 0)
         self._obj.position = self._start_position + delta * 0.05
     
     def stop(self) -> None:
@@ -63,7 +33,7 @@ class UserMoveActionHandler:
 
 
 class UserRotateActionHandler:
-    def __init__(self, obj: scene.GameObject):
+    def __init__(self, obj: scene.SceneObject):
         self._obj = obj
         self._start_rotation = None
         self._start_point = None
@@ -71,35 +41,35 @@ class UserRotateActionHandler:
     def start(self, point: tuple[int, int]) -> None:
         self._start_rotation = self._obj.rotation
         self._start_point = point
-    
+
     def update(self, point: tuple[int, int]) -> None:
         if self._start_point is None:
             return
-        delta = models.Point(self._start_point[1] - point[1], self._start_point[0] - point[0], 0)
+        delta = types.Vector3(self._start_point[1] - point[1], self._start_point[0] - point[0], 0)
         self._obj.rotation = self._start_rotation + delta * 0.01
-    
+
     def stop(self) -> None:
         self._start_point = None
 
 
 class UserScaleAction:
-    def __init__(self, obj: scene.GameObject):
+    def __init__(self, obj: scene.SceneObject):
         self._obj = obj
 
     def update(self, direction: int) -> None:
-        new_scale = self._obj.scale + direction * 0.03
-        self._obj.scale = max(new_scale, 0.0)
+        new_scale = max(self._obj.scale.x + direction * 0.03, 0.0)
+        self._obj.scale = types.Vector3(new_scale, new_scale, new_scale)
 
 
 class SettingsWidget(QWidget):
     _RENDER_MODE = {
-        'Каркасная': renderer.RenderMode.WIREFRAME,
-        'Заливка': renderer.RenderMode.FILL,
+        'Каркасная': engine.RenderMode.WIREFRAME,
+        'Заливка': engine.RenderMode.FILL,
     }
 
     _PROJECTION_TYPE = {
-        'Изометрия': renderer.ProjectionType.ISOMETRIC,
-        'Перспектива': renderer.ProjectionType.PERSPECTIVE,
+        'Изометрия': engine.ProjectionType.ISOMETRIC,
+        'Перспектива': engine.ProjectionType.PERSPECTIVE,
     }
 
     class _Spinbox(QDoubleSpinBox):
@@ -132,11 +102,10 @@ class SettingsWidget(QWidget):
             if subscriber not in self._on_change_subscribers:
                 self._on_change_subscribers.append(subscriber)
 
-    def __init__(self, config: renderer.Config, object: scene.GameObject, lights: dict[str, scene.Light]):
+    def __init__(self, _engine: engine.Engine, _scene: scene.Scene):
         super().__init__()
-        self.__config = config
-        self.__object = object
-        self.__lights = lights
+        self._engine = _engine
+        self._scene = _scene
 
         main_layout = QVBoxLayout()
         self.__init_widgets(main_layout)
@@ -195,34 +164,41 @@ class SettingsWidget(QWidget):
         return param_block_layout, children_info
 
     def _on_change(self):
-        self.__object.position = models.Point(
+        cylinder = self._scene.get_by_name('cylinder')
+        ambient_light = self._scene.get_by_name('ambient-light')
+        point_light = self._scene.get_by_name('point-light')
+        direction_light = self._scene.get_by_name('directional-light')
+
+        cylinder.position = types.Vector3(
             self._widgets_map['position.x'].value(),
             self._widgets_map['position.y'].value(),
             self._widgets_map['position.z'].value(),
         )
 
-        self.__object.rotation = models.Point(
+        cylinder.rotation = types.Vector3(
             self._widgets_map['rotation.x'].value(),
             self._widgets_map['rotation.y'].value(),
             self._widgets_map['rotation.z'].value(),
         )
 
-        self.__lights['ambient'].intensity = self._widgets_map['ambient_light.intensity'].value()
-        self.__lights['point'].intensity = self._widgets_map['point_light.intensity'].value()
-        self.__lights['point'].position = models.Point(
+        ambient_light.intensity = self._widgets_map['ambient_light.intensity'].value()
+        
+        point_light.intensity = self._widgets_map['point_light.intensity'].value()
+        point_light.position = types.Vector3(
             self._widgets_map['point_light.x'].value(),
             self._widgets_map['point_light.y'].value(),
             self._widgets_map['point_light.z'].value(),
         )
-        self.__lights['direction'].intensity = self._widgets_map['direction_light.intensity'].value()
-        self.__lights['direction'].direction = models.Point(
+
+        direction_light.intensity = self._widgets_map['direction_light.intensity'].value()
+        direction_light.direction = types.Vector3(
             self._widgets_map['direction_light.x'].value(),
             self._widgets_map['direction_light.y'].value(),
             self._widgets_map['direction_light.z'].value(),
         )
 
-        self.__config.mode = self._RENDER_MODE[self._widgets_map['render_mode'].currentText()]
-        self.__config.projection = self._PROJECTION_TYPE[self._widgets_map['projection'].currentText()]
+        self._engine.render_config.mode = self._RENDER_MODE[self._widgets_map['render_mode'].currentText()]
+        self._engine.render_config.projection = self._PROJECTION_TYPE[self._widgets_map['projection'].currentText()]
 
     def _normalize(self, angle: float) -> float:
         while not (0 <= angle <= 2 * math.pi):
@@ -231,13 +207,15 @@ class SettingsWidget(QWidget):
         return angle
 
     def paintEvent(self, event: QPaintEvent) -> None:
-        self._widgets_map['position.x'].setValue(self.__object.position.x)
-        self._widgets_map['position.y'].setValue(self.__object.position.y)
-        self._widgets_map['position.z'].setValue(self.__object.position.z)
+        cylinder = self._scene.get_by_name('cylinder')
 
-        self._widgets_map['rotation.x'].setValue(self._normalize(self.__object.rotation.x))
-        self._widgets_map['rotation.y'].setValue(self._normalize(self.__object.rotation.y))
-        self._widgets_map['rotation.z'].setValue(self._normalize(self.__object.rotation.z))
+        self._widgets_map['position.x'].setValue(cylinder.position.x)
+        self._widgets_map['position.y'].setValue(cylinder.position.y)
+        self._widgets_map['position.z'].setValue(cylinder.position.z)
+
+        self._widgets_map['rotation.x'].setValue(self._normalize(cylinder.rotation.x))
+        self._widgets_map['rotation.y'].setValue(self._normalize(cylinder.rotation.y))
+        self._widgets_map['rotation.z'].setValue(self._normalize(cylinder.rotation.z))
 
         self.update()
 
@@ -357,39 +335,31 @@ class SettingsWidget(QWidget):
 
 
 class Canvas(QFrame):
-    def __init__(
-            self,
-            parent: QWidget,
-            render_config: renderer.Config,
-            object: scene.GameObject,
-            lights: Iterable[scene.Light],
-    ) -> None:
+    def __init__(self, parent: QWidget, _engine: engine.Engine, scene: scene.Scene) -> None:
         super().__init__(parent)
         self.setMinimumSize(QSize(400, 400))
         self.setStyleSheet('background-color: #000000')
 
-        self._pyramid = object
-        self._lights = tuple(lights)
+        self._engine = _engine
+        self._scene = scene
 
-        self._render_config = render_config
+        cylinder = self._scene.get_by_name('cylinder')
 
-        self._renderer = renderer.Renderer(self._render_config)
-
-        self._move_handler = UserMoveActionHandler(self._pyramid)
-        self._rotate_handler = UserRotateActionHandler(self._pyramid)
-        self._scale_handler = UserScaleAction(self._pyramid)
+        self._move_handler = UserMoveActionHandler(cylinder)
+        self._rotate_handler = UserRotateActionHandler(cylinder)
+        self._scale_handler = UserScaleAction(cylinder)
 
     def put_pixel(self, image: QImage, point: tuple[int, int], color: QColor) -> None:
         image.setPixelColor(point[0], point[1], color)
 
     def paintEvent(self, _: QPaintEvent) -> None:
         painter = QPainter()
-        viewport = QImageViewport(self.size().width(), self.size().height())
-
         painter.begin(self)
-        self._renderer.render(viewport, self._pyramid.mesh(), self._lights)
 
-        painter.drawImage(0, 0, viewport.image)
+        canvas_size = engine.CanvasSize(self.size().width(), self.size().height())
+        rendered_data = self._engine.render(canvas_size, self._scene)
+        image = QImage(rendered_data.data, canvas_size.width, canvas_size.height, 4 * canvas_size.width, QImage.Format_RGBA8888)
+        painter.drawImage(0, 0, image)
         painter.end()
 
         self.update()
@@ -416,7 +386,7 @@ class Canvas(QFrame):
         self._scale_handler.update(direction)
 
     def resizeEvent(self, event: QResizeEvent) -> None:
-        self._render_config.view_size = (1.0, event.size().height() / event.size().width())
+        self._engine.render_config.view_size = (1.0, event.size().height() / event.size().width())
 
 
 class MainWindow(QWidget):
@@ -424,26 +394,29 @@ class MainWindow(QWidget):
         super().__init__()
         self.setMinimumSize(QSize(400, 400))
 
-        self.__render_config = renderer.Config(
-            d=1,
+        self._render_config = engine.Config(
+            d=1.0,
             view_size=(1.0, 1.0),
-            mode=renderer.RenderMode.FILL,
-            projection=renderer.ProjectionType.PERSPECTIVE,
+            mode=engine.RenderMode.FILL,
+            projection=engine.ProjectionType.PERSPECTIVE,
         )
+
+        self._engine = engine.Engine(self._render_config)
 
         vertices_amount = int(input('Количество вершин: '))
-        self.__object = scene.GameObject(
-            scale=1,
-            rotation=models.Point(0, 0, 0),
-            position=models.Point(0, 0, 5),
-            mesh=cylinder(1.0, 2.0, vertices_amount, models.Color(0, 255, 0), 500.0),
+        self._cylinder = scene.SceneObject(
+            name='cylinder',
+            scale=types.Vector3(1.0, 1.0, 1.0),
+            rotation=types.Vector3(0, 0, 0),
+            position=types.Vector3(0, 0, 5),
+            mesh=cylinder(1.0, 2.0, vertices_amount, types.Color(0, 255, 0), 500.0),
         )
 
-        self.__lights = {
-            'ambient' : scene.AmbientLight(1.0),
-            'point': scene.PointLight(1.0, models.Point(0.0, 0.0, 0.0)),
-            'direction': scene.PointLight(0.0, models.Point(0.0, 0.0, 0.0)),
-        }
+        self._scene = scene.Scene()
+        self._scene.add_object(self._cylinder)
+        self._scene.add_object(scene.AmbientLight('ambient-light', 1.0))
+        self._scene.add_object(scene.PointLight('point-light', 1.0, types.Vector3(0.0, 0.0, 0.0)))
+        self._scene.add_object(scene.DirectionalLight('directional-light', 1.0, types.Vector3(0.0, 0.0, 0.0)))
 
         self.__layout = QVBoxLayout()
         self.__init_widgets(self.__layout)
@@ -452,16 +425,8 @@ class MainWindow(QWidget):
     def __init_widgets(self, layout: QVBoxLayout) -> None:
         canvas_with_settings_layout = QHBoxLayout()
 
-        canvas_with_settings_layout.addWidget(SettingsWidget(
-            self.__render_config,
-            self.__object,
-            self.__lights,
-        ), 0)
-
-        canvas_with_settings_layout.addWidget(
-            Canvas(self, self.__render_config, self.__object, self.__lights.values()),
-            1,
-        )
+        canvas_with_settings_layout.addWidget(SettingsWidget(self._engine, self._scene), 0)
+        canvas_with_settings_layout.addWidget(Canvas(self, self._engine, self._scene), 1)
 
         layout.addLayout(canvas_with_settings_layout)
 
