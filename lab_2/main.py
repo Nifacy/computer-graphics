@@ -1,5 +1,6 @@
 import math
 import sys
+import os
 
 from PyQt5.QtCore import QSize, Qt
 from PyQt5.QtGui import QPainter, QMouseEvent, QPaintEvent, QWheelEvent, QResizeEvent, QImage, QColor, QFont
@@ -7,6 +8,10 @@ from PyQt5.QtWidgets import QApplication, QWidget, QFrame, QVBoxLayout, QHBoxLay
 from PyQt5.QtWidgets import QDoubleSpinBox, QComboBox, QLabel, QSpacerItem, QSizePolicy
 
 from engine import engine, scene, types, model
+
+
+CURDIR_PATH = os.path.split(__file__)[0]
+MODEL_PATH = os.path.join(CURDIR_PATH, './models/pyramid.obj')
 
 
 class UserMoveActionHandler:
@@ -328,12 +333,12 @@ class MainWindow(QWidget):
             scale=types.Vector3(1.0, 1.0, 1.0),
             rotation=types.Vector3(0, 0, 0),
             position=types.Vector3(0, 0, 5),
-            mesh=model.load('./models/pyramid.obj'),
+            mesh=model.load(MODEL_PATH),
         )
 
         self._scene = scene.Scene()
         self._scene.add_object(self._pyramid)
-        self._scene.add_object(scene.AmbientLight(1.0))
+        self._scene.add_object(scene.AmbientLight('', 1.0))
 
         self.__layout = QVBoxLayout()
         self.__init_widgets(self.__layout)
