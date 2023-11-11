@@ -13,3 +13,7 @@ class Engine:
         triangles, lights = scene.dump_scene(s)
         rendered_data = self._renderer.render(canvas_size, triangles, lights)
         return rendered_data
+
+    @property
+    def render_config(self) -> Config:
+        return self._render_config
