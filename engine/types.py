@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Iterator
 from . import _bindings
 
 
@@ -28,6 +29,16 @@ class Vector3:
             self.y * coef,
             self.z * coef,
         )
+
+    def dot(self, other: 'Vector3') -> 'Vector3':
+        return Vector3(
+            self.x * other.x,
+            self.y * other.y,
+            self.z * other.z,
+        )
+
+    def __iter__(self) -> Iterator[float]:
+        return iter([self.x, self.y, self.z])
 
     @property
     def raw(self) -> _bindings.Vector3:
