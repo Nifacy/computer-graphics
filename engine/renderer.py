@@ -49,7 +49,7 @@ class Renderer:
         canvas_size: CanvasSize,
         triangles: list[types.Triangle],
         lights: Iterable[light.Light],
-    ) -> None:
+    ) -> numpy.ndarray:
         data = numpy.zeros((canvas_size.height, canvas_size.width, 4), dtype=numpy.uint8)
         raw_triangles = (_bindings.Triangle * len(triangles))(*map(lambda t: t.raw, triangles))
         raw_lights = (_bindings.Light * len(lights))(*map(lambda t: t.raw, lights))
