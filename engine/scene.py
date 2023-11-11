@@ -20,7 +20,7 @@ class SceneObject:
 
 def _translate(scene_object: SceneObject, triangles: Iterable[types.Triangle]) -> Iterable[types.Triangle]:
     for triangle in triangles:
-        triangle.point = tuple(point + scene_object.position for point in triangle.points)
+        triangle.points = tuple(point + scene_object.position for point in triangle.points)
         yield triangle
 
 
