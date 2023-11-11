@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QFrame, QVBoxLayout, QHBoxLay
 from PyQt5.QtWidgets import QDoubleSpinBox, QComboBox, QLabel, QSpacerItem, QSizePolicy
 
 from engine import engine, types, scene
-from model_templates import cylinder
+from .model_templates import cylinder
 
 
 class UserMoveActionHandler:
