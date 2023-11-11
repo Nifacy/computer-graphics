@@ -1,47 +1,16 @@
 import math
 import sys
-import numpy as np
-
-import engine.renderer as renderer
 
 from PyQt5.QtCore import QSize, Qt
 from PyQt5.QtGui import QPainter, QMouseEvent, QPaintEvent, QWheelEvent, QResizeEvent, QImage, QColor, QFont
 from PyQt5.QtWidgets import QApplication, QWidget, QFrame, QVBoxLayout, QHBoxLayout
 from PyQt5.QtWidgets import QDoubleSpinBox, QComboBox, QLabel, QSpacerItem, QSizePolicy
 
-from engine import model, renderer, models, scene
-
-
-class QImageViewport(renderer.IViewport):
-    def __init__(self, width: int, height: int) -> None:
-        self._image = self.__create_image(width, height)
-        self._width = width
-        self._height = height
-
-    @staticmethod
-    def __create_image(width: str, height: str) -> QImage:
-        image = QImage(QSize(width, height), QImage.Format_RGBA8888)
-        image.fill(QColor(255, 255, 255, 255))
-        return image
-
-    def update(self, data: np.ndarray) -> None:
-        bytesPerLine = 4 * self.width()
-        qimage = QImage(data.data, self.width(), self.height(), bytesPerLine, QImage.Format_RGBA8888)
-        self._image = qimage
-
-    @property
-    def image(self) -> QImage:
-        return self._image
-
-    def width(self) -> int:
-        return self._width
-    
-    def height(self) -> int:
-        return self._height
+from engine import engine, scene, types, model
 
 
 class UserMoveActionHandler:
-    def __init__(self, obj: scene.GameObject):
+    def __init__(self, obj: scene.SceneObject):
         self._obj = obj
         self._start_position = None
         self._start_point = None
@@ -53,7 +22,7 @@ class UserMoveActionHandler:
     def update(self, point: tuple[int, int]) -> None:
         if self._start_point is None:
             return
-        delta = models.Point(point[0] - self._start_point[0], self._start_point[1] - point[1], 0)
+        delta = types.Vector3(point[0] - self._start_point[0], self._start_point[1] - point[1], 0)
         self._obj.position = self._start_position + delta * 0.05
     
     def stop(self) -> None:
@@ -61,7 +30,7 @@ class UserMoveActionHandler:
 
 
 class UserRotateActionHandler:
-    def __init__(self, obj: scene.GameObject):
+    def __init__(self, obj: scene.SceneObject):
         self._obj = obj
         self._start_rotation = None
         self._start_point = None
@@ -69,35 +38,35 @@ class UserRotateActionHandler:
     def start(self, point: tuple[int, int]) -> None:
         self._start_rotation = self._obj.rotation
         self._start_point = point
-    
+
     def update(self, point: tuple[int, int]) -> None:
         if self._start_point is None:
             return
-        delta = models.Point(self._start_point[1] - point[1], self._start_point[0] - point[0], 0)
+        delta = types.Vector3(self._start_point[1] - point[1], self._start_point[0] - point[0], 0)
         self._obj.rotation = self._start_rotation + delta * 0.01
-    
+
     def stop(self) -> None:
         self._start_point = None
 
 
 class UserScaleAction:
-    def __init__(self, obj: scene.GameObject):
+    def __init__(self, obj: scene.SceneObject):
         self._obj = obj
 
     def update(self, direction: int) -> None:
-        new_scale = self._obj.scale + direction * 0.03
-        self._obj.scale = max(new_scale, 0.0)
+        new_scale = max(self._obj.scale.x + direction * 0.03, 0.0)
+        self._obj.scale = types.Vector3(new_scale, new_scale, new_scale)
 
 
 class SettingsWidget(QWidget):
     _RENDER_MODE = {
-        'Каркасная': renderer.RenderMode.WIREFRAME,
-        'Заливка': renderer.RenderMode.FILL,
+        'Каркасная': engine.RenderMode.WIREFRAME,
+        'Заливка': engine.RenderMode.FILL,
     }
 
     _PROJECTION_TYPE = {
-        'Изометрия': renderer.ProjectionType.ISOMETRIC,
-        'Перспектива': renderer.ProjectionType.PERSPECTIVE,
+        'Изометрия': engine.ProjectionType.ISOMETRIC,
+        'Перспектива': engine.ProjectionType.PERSPECTIVE,
     }
 
     class _Spinbox(QDoubleSpinBox):
@@ -130,10 +99,10 @@ class SettingsWidget(QWidget):
             if subscriber not in self._on_change_subscribers:
                 self._on_change_subscribers.append(subscriber)
 
-    def __init__(self, config: renderer.Config, object: scene.GameObject):
+    def __init__(self, _engine: engine.Engine, _scene: scene.Scene):
         super().__init__()
-        self.__config = config
-        self.__object = object
+        self._engine = _engine
+        self.__object = _scene.get_by_name('pyramid')
 
         main_layout = QVBoxLayout()
         self.__init_widgets(main_layout)
@@ -192,20 +161,20 @@ class SettingsWidget(QWidget):
         return param_block_layout, children_info
 
     def _on_change(self):
-        self.__object.position = models.Point(
+        self.__object.position = types.Vector3(
             self._widgets_map['position.x'].value(),
             self._widgets_map['position.y'].value(),
             self._widgets_map['position.z'].value(),
         )
 
-        self.__object.rotation = models.Point(
+        self.__object.rotation = types.Vector3(
             self._widgets_map['rotation.x'].value(),
             self._widgets_map['rotation.y'].value(),
             self._widgets_map['rotation.z'].value(),
         )
 
-        self.__config.mode = self._RENDER_MODE[self._widgets_map['render_mode'].currentText()]
-        self.__config.projection = self._PROJECTION_TYPE[self._widgets_map['projection'].currentText()]
+        self._engine.render_config.mode = self._RENDER_MODE[self._widgets_map['render_mode'].currentText()]
+        self._engine.render_config.projection = self._PROJECTION_TYPE[self._widgets_map['projection'].currentText()]
 
     def _normalize(self, angle: float) -> float:
         while not (0 <= angle <= 2 * math.pi):
@@ -286,30 +255,31 @@ class SettingsWidget(QWidget):
 
 
 class Canvas(QFrame):
-    def __init__(self, parent: QWidget, render_config: renderer.Config, object: scene.GameObject) -> None:
+    def __init__(self, parent: QWidget, _engine: engine.Engine, scene: scene.Scene) -> None:
         super().__init__(parent)
         self.setMinimumSize(QSize(400, 400))
         self.setStyleSheet('background-color: #000000')
 
-        self._pyramid = object
-        self._render_config = render_config
+        self._engine = _engine
+        self._scene = scene
 
-        self._renderer = renderer.Renderer(self._render_config)
+        pyramid = self._scene.get_by_name('pyramid')
 
-        self._move_handler = UserMoveActionHandler(self._pyramid)
-        self._rotate_handler = UserRotateActionHandler(self._pyramid)
-        self._scale_handler = UserScaleAction(self._pyramid)
+        self._move_handler = UserMoveActionHandler(pyramid)
+        self._rotate_handler = UserRotateActionHandler(pyramid)
+        self._scale_handler = UserScaleAction(pyramid)
 
     def put_pixel(self, image: QImage, point: tuple[int, int], color: QColor) -> None:
         image.setPixelColor(point[0], point[1], color)
 
     def paintEvent(self, _: QPaintEvent) -> None:
         painter = QPainter()
-        viewport = QImageViewport(self.size().width(), self.size().height())
-
         painter.begin(self)
-        self._renderer.render(viewport, self._pyramid.mesh())
-        painter.drawImage(0, 0, viewport.image)
+
+        canvas_size = engine.CanvasSize(self.size().width(), self.size().height())
+        rendered_data = self._engine.render(canvas_size, self._scene)
+        image = QImage(rendered_data.data, canvas_size.width, canvas_size.height, 4 * canvas_size.width, QImage.Format_RGBA8888)
+        painter.drawImage(0, 0, image)
         painter.end()
 
         self.update()
@@ -336,7 +306,7 @@ class Canvas(QFrame):
         self._scale_handler.update(direction)
 
     def resizeEvent(self, event: QResizeEvent) -> None:
-        self._render_config.view_size = (1.0, event.size().height() / event.size().width())
+        self._engine.render_config.view_size = (1.0, event.size().height() / event.size().width())
 
 
 class MainWindow(QWidget):
@@ -344,19 +314,26 @@ class MainWindow(QWidget):
         super().__init__()
         self.setMinimumSize(QSize(400, 400))
 
-        self.__render_config = renderer.Config(
-            d=1,
+        self._render_config = engine.Config(
+            d=1.0,
             view_size=(1.0, 1.0),
-            mode=renderer.RenderMode.FILL,
-            projection=renderer.ProjectionType.PERSPECTIVE,
+            mode=engine.RenderMode.FILL,
+            projection=engine.ProjectionType.PERSPECTIVE,
         )
 
-        self.__object = scene.GameObject(
-            scale=1,
-            rotation=models.Point(0, 0, 0),
-            position=models.Point(0, 0, 5),
+        self._engine = engine.Engine(self._render_config)
+
+        self._pyramid = scene.SceneObject(
+            name='pyramid',
+            scale=types.Vector3(1.0, 1.0, 1.0),
+            rotation=types.Vector3(0, 0, 0),
+            position=types.Vector3(0, 0, 5),
             mesh=model.load('./models/pyramid.obj'),
         )
+
+        self._scene = scene.Scene()
+        self._scene.add_object(self._pyramid)
+        self._scene.add_object(scene.AmbientLight(1.0))
 
         self.__layout = QVBoxLayout()
         self.__init_widgets(self.__layout)
@@ -365,8 +342,8 @@ class MainWindow(QWidget):
     def __init_widgets(self, layout: QVBoxLayout) -> None:
         canvas_with_settings_layout = QHBoxLayout()
 
-        canvas_with_settings_layout.addWidget(SettingsWidget(self.__render_config, self.__object), 0)
-        canvas_with_settings_layout.addWidget(Canvas(self, self.__render_config, self.__object), 1)
+        canvas_with_settings_layout.addWidget(SettingsWidget(self._engine, self._scene), 0)
+        canvas_with_settings_layout.addWidget(Canvas(self, self._engine, self._scene), 1)
 
         layout.addLayout(canvas_with_settings_layout)
 
