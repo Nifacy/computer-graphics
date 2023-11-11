@@ -150,7 +150,7 @@ public:
 
     void PutPixel(const CanvasPoint& point, const Color& color) override {
         int cx = __canvas.width / 2, cy = __canvas.height / 2;
-        int x = point.x + cx, y = point.y + cy;
+        int x = point.x + cx, y = cy - point.y;
 
         if (!ValidateCoordinates(x, y)) {
             return;
