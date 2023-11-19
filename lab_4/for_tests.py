@@ -10,15 +10,13 @@ Point = namedtuple('Point', ['x', 'y'])
 Triangle = tuple[Point, Point, Point]
 
 def dump_triangles(triangles: Iterable[Triangle]) -> np.array:
-    return np.array(list(itertools.chain(*triangles)), dtype='f4')
+    return np.concatenate(triangles, axis=0).astype('f4')
 
 
 def draw_triangle(triangles: Iterable[Triangle], canvas_size: tuple[int, int]) -> np.ndarray:
     ctx = moderngl.create_standalone_context()
 
-    vertices = dump_triangles(triangles)
-
-    vbo = ctx.buffer(vertices)
+    vbo = ctx.buffer(dump_triangles(triangles))
     prog = ctx.program(
         vertex_shader='''
             #version 330
