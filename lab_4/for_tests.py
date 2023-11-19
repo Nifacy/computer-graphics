@@ -1,3 +1,5 @@
+import itertools
+from typing import Iterable
 import moderngl
 from collections import namedtuple
 import numpy as np
@@ -5,15 +7,16 @@ from PIL import Image
 
 # Определение структуры Point
 Point = namedtuple('Point', ['x', 'y'])
+Triangle = tuple[Point, Point, Point]
 
-def draw_triangle(triangle: tuple[Point, Point, Point], canvas_size: tuple[int, int]) -> np.ndarray:
+def dump_triangles(triangles: Iterable[Triangle]) -> np.array:
+    return np.array(list(itertools.chain(*triangles)), dtype='f4')
+
+
+def draw_triangle(triangles: Iterable[Triangle], canvas_size: tuple[int, int]) -> np.ndarray:
     ctx = moderngl.create_standalone_context()
 
-    vertices = np.array([
-        triangle[0].x, triangle[0].y, 
-        triangle[1].x, triangle[1].y, 
-        triangle[2].x, triangle[2].y
-    ], dtype='f4')
+    vertices = dump_triangles(triangles)
 
     vbo = ctx.buffer(vertices)
     prog = ctx.program(
@@ -45,12 +48,11 @@ def draw_triangle(triangle: tuple[Point, Point, Point], canvas_size: tuple[int, 
     return image
 
 
-triangle = (
-    Point(-0.5, -0.5),
-    Point(0.0, 0.5),
-    Point(0.5, -0.5),
-)
+triangles = [
+    (Point(-0.2, -0.2), Point(0.0, 0.2), Point(0.2, -0.2)),
+    (Point(0.3, -0.2), Point(0.5, 0.2), Point(0.7, -0.2)),
+]
 
-data = draw_triangle(triangle, (400, 400))
+data = draw_triangle(triangles, (400, 400))
 image = Image.fromarray(data, 'RGB')
 image.show()
