@@ -67,6 +67,10 @@ class PointLight(Light):
 @dataclass
 class DirectionalLight(Light):
     direction: types.Vector3
+    _program: moderngl.Program = _context.program(
+        **_common.load_shader('direction_light'),
+        varyings=['out_vert', 'out_normal', 'out_color', 'out_intensity', 'out_specular'],
+    )
 
     @property
     def raw(self) -> _bindings.Light:
@@ -75,3 +79,12 @@ class DirectionalLight(Light):
             intensity=self.intensity,
             position=self.direction.raw,
         )
+
+    def transform(self, in_buffer: moderngl.Buffer, out_buffer: moderngl.Buffer) -> None:
+        self._program['intensity'] = self.intensity
+        self._program['direction'] = tuple(self.direction)
+        arr = _context.vertex_array(
+            self._program, in_buffer,
+            'in_vert', 'in_normal', 'in_color', 'in_intensity', 'in_specular',
+        )
+        arr.transform(out_buffer)
