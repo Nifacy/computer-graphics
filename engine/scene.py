@@ -1,22 +1,46 @@
 import copy
+import itertools
 from typing import Iterable, NewType
 from dataclasses import dataclass
 import numpy as np
 
-from . import types
-from ._light import Light, AmbientLight, PointLight, DirectionalLight
+from . import types, _light
 
 
 Mesh = NewType('Mesh', tuple[types.Triangle, ...])
 
 
 @dataclass
-class SceneObject:
+class ObjectBase:
     name: str
+
+
+@dataclass
+class SceneObject(ObjectBase):
     rotation: types.Vector3
     position: types.Vector3
-    scale: float
+    scale: types.Vector3
     mesh: Mesh
+
+
+@dataclass
+class Light(ObjectBase):
+    intensity: float
+
+
+@dataclass
+class AmbientLight(Light):
+    pass
+
+
+@dataclass
+class PointLight(Light):
+    position: types.Vector3
+
+
+@dataclass
+class DirectionalLight(Light):
+    direction: types.Vector3
 
 
 def _translate(scene_object: SceneObject, triangles: Iterable[types.Triangle]) -> Iterable[types.Triangle]:
@@ -88,25 +112,33 @@ class Scene:
     def __init__(self):
         self._objects = []
         self._lights = []
-    
-    def add_object(self, scene_object: SceneObject | Light) -> None:
+
+    def add_object(self, scene_object: ObjectBase) -> None:
         objects_container = self._objects if isinstance(scene_object, SceneObject) else self._lights
 
         if scene_object not in objects_container:
             objects_container.append(scene_object)
-    
-    def get_by_name(self, name: str) -> SceneObject | None:
-        for obj in self._objects:
+
+    def get_by_name(self, name: str) -> ObjectBase | None:
+        for obj in itertools.chain(self._objects, self._lights):
             if obj.name == name:
                 return obj
         return None
 
 
 def dump_scene(scene: Scene) -> tuple[tuple[types.Triangle, ...], tuple[Light, ...]]:
-    lights = tuple(scene._lights)
+    lights = []
     triangles = []
 
     for scene_object in scene._objects:
         triangles.extend(_dump_scene_object(scene_object))
     
-    return tuple(triangles), lights
+    for light_object in scene._lights:
+        if isinstance(light_object, AmbientLight):
+            lights.append(_light.AmbientLight(light_object.intensity))
+        elif isinstance(light_object, PointLight):
+            lights.append(_light.PointLight(light_object.intensity, light_object.position))
+        elif isinstance(light_object, DirectionalLight):
+            lights.append(_light.DirectionalLight(light_object.intensity, light_object.direction))
+    
+    return tuple(triangles), tuple(lights)
