@@ -1,17 +1,14 @@
 from dataclasses import dataclass
 
 import moderngl
-from . import _bindings, _common, types
+from . import _common, types
 
 _context = _common.create_context()
+
 
 @dataclass
 class Light:
     intensity: float
-
-    @property
-    def raw(self) -> _bindings.Light:
-        raise NotImplementedError
 
 
 @dataclass
@@ -21,14 +18,6 @@ class AmbientLight(Light):
         varyings=['out_vert', 'out_normal', 'out_color', 'out_intensity', 'out_specular'],
     )
 
-    @property
-    def raw(self) -> _bindings.Light:
-        return _bindings.Light(
-            type=_bindings.LightType.AMBIENT,
-            intensity=self.intensity,
-            position=_bindings.Vector3(0.0, 0.0, 0.0),
-        )
-    
     def transform(self, in_buffer: moderngl.Buffer, out_buffer: moderngl.Buffer) -> None:
         self._program['intensity'] = self.intensity
         arr = _context.vertex_array(
@@ -45,14 +34,6 @@ class PointLight(Light):
         **_common.load_shader('point_light'),
         varyings=['out_vert', 'out_normal', 'out_color', 'out_intensity', 'out_specular'],
     )
-
-    @property
-    def raw(self) -> _bindings.Light:
-        return _bindings.Light(
-            type=_bindings.LightType.POINT,
-            intensity=self.intensity,
-            position=self.position.raw,
-        )
 
     def transform(self, in_buffer: moderngl.Buffer, out_buffer: moderngl.Buffer) -> None:
         self._program['intensity'] = self.intensity
@@ -71,14 +52,6 @@ class DirectionalLight(Light):
         **_common.load_shader('direction_light'),
         varyings=['out_vert', 'out_normal', 'out_color', 'out_intensity', 'out_specular'],
     )
-
-    @property
-    def raw(self) -> _bindings.Light:
-        return _bindings.Light(
-            type=_bindings.LightType.DIRECTION,
-            intensity=self.intensity,
-            position=self.direction.raw,
-        )
 
     def transform(self, in_buffer: moderngl.Buffer, out_buffer: moderngl.Buffer) -> None:
         self._program['intensity'] = self.intensity

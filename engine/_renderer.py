@@ -6,7 +6,7 @@ import moderngl
 from OpenGL import GL
 import numpy
 
-from . import types, _light, _bindings, _common
+from . import types, _light, _common
 
 class RenderMode(Enum):
     WIREFRAME = 1
@@ -30,15 +30,6 @@ class Config:
     view_size: tuple[float, float]
     mode: RenderMode
     projection: ProjectionType
-
-    @property
-    def raw(self) -> _bindings.Config:
-        return _bindings.Config(
-            d=self.d,
-            viewSize=self.view_size,
-            mode=self.mode.value,
-            projection=self.projection.value,
-        )
 
 
 class Renderer:
