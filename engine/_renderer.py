@@ -78,7 +78,7 @@ class Renderer:
         template_buffer = self._context.buffer(reserve=vertex_buffer.size)
 
         for light in lights:
-            if isinstance(light, _light.AmbientLight):
+            if isinstance(light, (_light.AmbientLight, _light.PointLight)):
                 light.transform(vertex_buffer, template_buffer)
                 vertex_buffer, template_buffer = template_buffer, vertex_buffer
 
