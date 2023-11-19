@@ -6,7 +6,7 @@ import moderngl
 from OpenGL import GL
 import numpy
 
-from . import types, _light, _bindings
+from . import types, _light, _bindings, _common
 
 class RenderMode(Enum):
     WIREFRAME = 1
@@ -44,7 +44,7 @@ class Config:
 class Renderer:
     def __init__(self, config: Config) -> None:
         self._config = config
-        self._context = moderngl.create_standalone_context()
+        self._context = _common.create_context()
         self._shader = self._context.program(
             vertex_shader='''
                 #version 330
