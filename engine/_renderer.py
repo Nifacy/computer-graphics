@@ -45,7 +45,7 @@ class Renderer:
     def __init__(self, config: Config) -> None:
         self._config = config
         self._context = _common.create_context()
-        self._shader = _common.load_shader('render')
+        self._shader = self._context.program(**_common.load_shader('render'))
 
     @staticmethod
     def _dump_triangles(triangles: Iterable[types.Triangle]) -> numpy.ndarray:

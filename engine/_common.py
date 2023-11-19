@@ -20,7 +20,7 @@ def create_context() -> moderngl.Context:
     return moderngl.create_standalone_context()
 
 
-def load_shader(shader_name: str) -> moderngl.Program:
+def load_shader(shader_name: str) -> dict:
     shader_path = _SHADERS_STORAGE_PATH / Path(shader_name)
     vertex_shader_path = _SHADERS_STORAGE_PATH / Path(f'{shader_name}/vertex.glsl')
     fragment_shader_path = _SHADERS_STORAGE_PATH / Path(f'{shader_name}/fragment.glsl')
@@ -38,4 +38,4 @@ def load_shader(shader_name: str) -> moderngl.Program:
         with fragment_shader_path.open('r', encoding='utf-8') as shader_file:
             shaders_data['fragment_shader'] = shader_file.read()
     
-    return create_context().program(**shaders_data)
+    return shaders_data
