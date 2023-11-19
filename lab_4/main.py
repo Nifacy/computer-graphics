@@ -358,7 +358,7 @@ class Canvas(QFrame):
 
         canvas_size = engine.CanvasSize(self.size().width(), self.size().height())
         rendered_data = self._engine.render(canvas_size, self._scene)
-        image = QImage(rendered_data.data, canvas_size.width, canvas_size.height, 4 * canvas_size.width, QImage.Format_RGBA8888)
+        image = QImage(rendered_data.data, canvas_size.width, canvas_size.height, 3 * canvas_size.width, QImage.Format_RGB888)
         painter.drawImage(0, 0, image)
         painter.end()
 
