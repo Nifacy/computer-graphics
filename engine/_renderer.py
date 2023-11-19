@@ -54,9 +54,10 @@ class Renderer:
         for triangle in triangles:
             color = [triangle.color.r / 255, triangle.color.g / 255, triangle.color.b / 255]
 
-            for point in triangle.points:
-                dumped_triangles.append(list(point))
-                dumped_triangles.append(color)
+            for point, normal in zip(triangle.points, triangle.normals):
+                point = list(point)
+                normal = list(normal)
+                dumped_triangles.append([*point, *normal, *color, 1.0, triangle.specular])
 
         return numpy.concatenate(dumped_triangles, axis=0).astype('f4')
 
@@ -74,12 +75,14 @@ class Renderer:
         )
 
         vertex_buffer = self._context.buffer(self._dump_triangles(triangles))
-        vertex_array = self._context.simple_vertex_array(self._shader, vertex_buffer, 'in_vert', 'in_color')
-
         frame_buffer.use()
         frame_buffer.clear(1.0, 1.0, 1.0, 1.0)
 
         self._shader['viewSize'] = self._config.view_size
+        vertex_array = self._context.simple_vertex_array(
+            self._shader, vertex_buffer,
+            'in_vert', 'in_normal', 'in_color', 'in_intensity', 'in_specular',
+        )
 
         if self._config.mode == RenderMode.WIREFRAME:
             self._context.wireframe = True
