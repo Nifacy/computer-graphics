@@ -38,24 +38,10 @@ class Renderer:
         self._context = _common.create_context()
         self._shader = self._context.program(**_common.load_shader('render'))
 
-    @staticmethod
-    def _dump_triangles(triangles: Iterable[types.Triangle]) -> numpy.ndarray:
-        dumped_triangles = []
-
-        for triangle in triangles:
-            color = [triangle.color.r / 255, triangle.color.g / 255, triangle.color.b / 255]
-
-            for point, normal in zip(triangle.points, triangle.normals):
-                point = list(point)
-                normal = list(normal)
-                dumped_triangles.append([*point, *normal, *color, 0.0, triangle.specular])
-
-        return numpy.concatenate(dumped_triangles, axis=0).astype('f4')
-
     def render(
         self,
         canvas_size: CanvasSize,
-        triangles: list[types.Triangle],
+        vertexes: numpy.ndarray,
         lights: Iterable[_light.Light],
     ) -> numpy.ndarray:
         _cnv = (canvas_size.width, canvas_size.height)
@@ -65,7 +51,7 @@ class Renderer:
             depth_attachment=self._context.depth_renderbuffer(_cnv),
         )
 
-        vertex_buffer = self._context.buffer(self._dump_triangles(triangles))
+        vertex_buffer = self._context.buffer(vertexes)
         template_buffer = self._context.buffer(reserve=vertex_buffer.size)
 
         for light in lights:
