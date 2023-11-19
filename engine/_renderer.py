@@ -58,7 +58,7 @@ class Renderer:
 
                 void main() {
                     vec3 v = in_vert;
-                    v = vec3(v.x / v.z, v.y / v.z, v.z / 100.0); // project point on view
+                    v = vec3(v.x / v.z, -v.y / v.z, v.z / 100.0); // project point on view
 
                     // fit point coordinates to viewSize
                     if (viewSize.y < 1.0) {
