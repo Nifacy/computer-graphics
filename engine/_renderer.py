@@ -57,7 +57,7 @@ class Renderer:
             for point, normal in zip(triangle.points, triangle.normals):
                 point = list(point)
                 normal = list(normal)
-                dumped_triangles.append([*point, *normal, *color, 1.0, triangle.specular])
+                dumped_triangles.append([*point, *normal, *color, 0.0, triangle.specular])
 
         return numpy.concatenate(dumped_triangles, axis=0).astype('f4')
 
@@ -75,6 +75,13 @@ class Renderer:
         )
 
         vertex_buffer = self._context.buffer(self._dump_triangles(triangles))
+        template_buffer = self._context.buffer(reserve=vertex_buffer.size)
+
+        for light in lights:
+            if isinstance(light, _light.AmbientLight):
+                light.transform(vertex_buffer, template_buffer)
+                vertex_buffer, template_buffer = template_buffer, vertex_buffer
+
         frame_buffer.use()
         frame_buffer.clear(1.0, 1.0, 1.0, 1.0)
 
