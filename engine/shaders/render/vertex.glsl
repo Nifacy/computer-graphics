@@ -12,10 +12,7 @@ out vec3 frag_color;
 out float frag_intensity;
 
 void main() {
-    vec3 tmp_n = in_normal;
-    float tmp_spec = in_specular;
-
-    vec3 v = in_vert;
+    vec3 v = in_vert + 0.00001 * in_normal / length(in_normal) + 0.00001 * in_specular * vec3(0.0, 1.0, 0.0);
     v = vec3(v.x / v.z, -v.y / v.z, v.z / 100.0); // project point on view
 
     // fit point coordinates to viewSize
