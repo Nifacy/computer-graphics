@@ -2,7 +2,7 @@ import copy
 import itertools
 from typing import Iterable, NewType
 from dataclasses import dataclass
-import numpy as np
+import numpy
 
 from . import types, _light
 
@@ -56,26 +56,26 @@ def _scale(scene_object: SceneObject, triangles: Iterable[types.Triangle]) -> It
 
 
 # TODO: rewrite using scipy
-def _get_matrix(index: int, angle: float) -> np.ndarray:
+def _get_matrix(index: int, angle: float) -> numpy.ndarray:
     samples = [
         [
             [1, 0, 0],
-            [0, np.cos(angle), -np.sin(angle)],
-            [0, np.sin(angle), np.cos(angle)],
+            [0, numpy.cos(angle), -numpy.sin(angle)],
+            [0, numpy.sin(angle), numpy.cos(angle)],
         ],
         [
-            [np.cos(angle), 0, np.sin(angle)],
+            [numpy.cos(angle), 0, numpy.sin(angle)],
             [0, 1, 0],
-            [-np.sin(angle), 0, np.cos(angle)],
+            [-numpy.sin(angle), 0, numpy.cos(angle)],
         ],
         [
-            [np.cos(angle), -np.sin(angle), 0],
-            [np.sin(angle), np.cos(angle), 0],
+            [numpy.cos(angle), -numpy.sin(angle), 0],
+            [numpy.sin(angle), numpy.cos(angle), 0],
             [0, 0, 1],
         ],
     ]
 
-    return np.array(samples[index], dtype=np.float16)
+    return numpy.array(samples[index], dtype=numpy.float16)
 
 
 def _rotate(scene_object: SceneObject, triangles: Iterable[types.Triangle]) -> Iterable[types.Triangle]:
@@ -84,13 +84,13 @@ def _rotate(scene_object: SceneObject, triangles: Iterable[types.Triangle]) -> I
         normals = []
 
         for point, normal in zip(triangle.points, triangle.normals):
-            pos = np.array([list(point)], dtype=np.float16)
-            n = np.array([list(normal)], dtype=np.float16)
+            pos = numpy.array([list(point)], dtype=numpy.float16)
+            n = numpy.array([list(normal)], dtype=numpy.float16)
 
             for i, angle in enumerate(scene_object.rotation):
                 rotation_matrix = _get_matrix(i, angle)
-                pos = np.matmul(pos, rotation_matrix)
-                n = np.matmul(n, rotation_matrix, n)
+                pos = numpy.matmul(pos, rotation_matrix)
+                n = numpy.matmul(n, rotation_matrix, n)
 
             points.append(types.Vector3(*pos[0]))
             normals.append(types.Vector3(*n[0]))
@@ -126,7 +126,21 @@ class Scene:
         return None
 
 
-def dump_scene(scene: Scene) -> tuple[tuple[types.Triangle, ...], tuple[Light, ...]]:
+def _dump_triangles(triangles: Iterable[types.Triangle]) -> numpy.ndarray:
+    dumped_triangles = []
+
+    for triangle in triangles:
+        color = [triangle.color.r / 255, triangle.color.g / 255, triangle.color.b / 255]
+
+        for point, normal in zip(triangle.points, triangle.normals):
+            point = list(point)
+            normal = list(normal)
+            dumped_triangles.append([*point, *normal, *color, 0.0, triangle.specular])
+
+    return numpy.concatenate(dumped_triangles, axis=0).astype('f4')
+
+
+def dump_scene(scene: Scene) -> tuple[numpy.ndarray, tuple[Light, ...]]:
     lights = []
     triangles = []
 
@@ -141,4 +155,4 @@ def dump_scene(scene: Scene) -> tuple[tuple[types.Triangle, ...], tuple[Light, .
         elif isinstance(light_object, DirectionalLight):
             lights.append(_light.DirectionalLight(light_object.intensity, light_object.direction))
     
-    return tuple(triangles), tuple(lights)
+    return _dump_triangles(triangles), tuple(lights)

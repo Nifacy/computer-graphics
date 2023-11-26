@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from typing import Iterator
-from . import _bindings
 
 
 @dataclass
@@ -40,10 +39,6 @@ class Vector3:
     def __iter__(self) -> Iterator[float]:
         return iter([self.x, self.y, self.z])
 
-    @property
-    def raw(self) -> _bindings.Vector3:
-        return _bindings.Vector3(self.x, self.y, self.z)
-
 
 @dataclass
 class Color:
@@ -52,10 +47,6 @@ class Color:
     b: int
     a: int = 255
 
-    @property
-    def raw(self) -> _bindings.Color:
-        return _bindings.Color(self.r, self.g, self.b, self.a)
-
 
 @dataclass
 class Triangle:
@@ -63,12 +54,3 @@ class Triangle:
     normals: tuple[Vector3, Vector3, Vector3]
     color: Color
     specular: float = 0.0
-
-    @property
-    def raw(self) -> _bindings.Triangle:
-        return _bindings.Triangle(
-            points=tuple(p.raw for p in self.points),
-            normals=tuple(n.raw for n in self.normals),
-            color=self.color.raw,
-            specular=self.specular,
-        )

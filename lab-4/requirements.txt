@@ -1,0 +1,1 @@
+https://download.lfd.uci.edu/pythonlibs/archived/PyOpenGL-3.1.6-cp311-cp311-win_amd64.whl

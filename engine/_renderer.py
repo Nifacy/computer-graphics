@@ -2,10 +2,11 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable
 
-import ctypes
+import moderngl
+from OpenGL import GL
 import numpy
 
-from . import types, _light, _bindings
+from . import types, _light, _common
 
 class RenderMode(Enum):
     WIREFRAME = 1
@@ -30,41 +31,47 @@ class Config:
     mode: RenderMode
     projection: ProjectionType
 
-    @property
-    def raw(self) -> _bindings.Config:
-        return _bindings.Config(
-            d=self.d,
-            viewSize=self.view_size,
-            mode=self.mode.value,
-            projection=self.projection.value,
-        )
-
 
 class Renderer:
     def __init__(self, config: Config) -> None:
         self._config = config
+        self._context = _common.create_context()
+        self._shader = self._context.program(**_common.load_shader('render'))
 
     def render(
         self,
         canvas_size: CanvasSize,
-        triangles: list[types.Triangle],
+        vertexes: numpy.ndarray,
         lights: Iterable[_light.Light],
     ) -> numpy.ndarray:
-        data = numpy.zeros((canvas_size.height, canvas_size.width, 4), dtype=numpy.uint8)
-        raw_triangles = (_bindings.Triangle * len(triangles))(*map(lambda t: t.raw, triangles))
-        raw_lights = (_bindings.Light * len(lights))(*map(lambda t: t.raw, lights))
+        _cnv = (canvas_size.width, canvas_size.height)
 
-        _bindings.render(
-            self._config.raw,
-            _bindings.Canvas(
-                pixels=data.ctypes.data_as(ctypes.POINTER(_bindings.Color)),
-                width=canvas_size.width,
-                height=canvas_size.height,
-            ),
-            raw_triangles,
-            len(triangles),
-            raw_lights,
-            len(lights),
+        frame_buffer = self._context.framebuffer(
+            color_attachments=self._context.texture(_cnv, 4),
+            depth_attachment=self._context.depth_renderbuffer(_cnv),
         )
 
-        return data
+        vertex_buffer = self._context.buffer(vertexes)
+        template_buffer = self._context.buffer(reserve=vertex_buffer.size)
+
+        for light in lights:
+            light.transform(vertex_buffer, template_buffer)
+            vertex_buffer, template_buffer = template_buffer, vertex_buffer
+
+        frame_buffer.use()
+        frame_buffer.clear(1.0, 1.0, 1.0, 1.0)
+
+        self._shader['viewSize'] = self._config.view_size
+        vertex_array = self._context.simple_vertex_array(
+            self._shader, vertex_buffer,
+            'in_vert', 'in_normal', 'in_color', 'in_intensity', 'in_specular',
+        )
+
+        if self._config.mode == RenderMode.WIREFRAME:
+            self._context.wireframe = True
+        GL.glEnable(GL.GL_DEPTH_TEST)
+        vertex_array.render(moderngl.TRIANGLES)
+        if self._config.mode == RenderMode.WIREFRAME:
+            self._context.wireframe = False
+
+        return numpy.frombuffer(frame_buffer.read(), dtype=numpy.uint8)
