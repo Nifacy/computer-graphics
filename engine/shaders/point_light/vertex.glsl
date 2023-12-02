@@ -5,13 +5,13 @@ uniform vec3 position;
 
 in vec3 in_vert;
 in vec3 in_normal;
-in vec3 in_color;
+in vec4 in_color;
 in float in_intensity;
 in float in_specular;
 
 out vec3 out_vert;
 out vec3 out_normal;
-out vec3 out_color;
+out vec4 out_color;
 out float out_intensity;
 out float out_specular;
 
@@ -26,7 +26,7 @@ void main() {
     }
 
     if (in_specular != 0.0) {
-        vec3 R = in_normal * 2 * dot(in_normal, L) - L;
+        vec3 R = in_normal * 2 * n_dot_l - L;
         float r_dot_v = dot(R, -position);
 
         if (r_dot_v > 0.0) {

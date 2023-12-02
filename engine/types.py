@@ -60,7 +60,7 @@ class Color:
     r: int
     g: int
     b: int
-    a: int = 255
+    a: float = 1.0
 
 
 @dataclass

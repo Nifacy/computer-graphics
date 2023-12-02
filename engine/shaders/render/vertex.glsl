@@ -4,11 +4,11 @@ uniform vec2 viewSize;
 
 in vec3 in_vert;
 in vec3 in_normal;
-in vec3 in_color;
+in vec4 in_color;
 in float in_intensity;
 in float in_specular;
 
-out vec3 frag_color;
+out vec4 frag_color;
 out float frag_intensity;
 
 void main() {

@@ -69,9 +69,13 @@ class Renderer:
 
         if self._config.mode == RenderMode.WIREFRAME:
             self._context.wireframe = True
-        GL.glEnable(GL.GL_DEPTH_TEST)
+        
+        # self._context.enable(moderngl.DEPTH_TEST)
+        self._context.enable(moderngl.BLEND)
+        # self._context.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA)
         vertex_array.render(moderngl.TRIANGLES)
+
         if self._config.mode == RenderMode.WIREFRAME:
             self._context.wireframe = False
 
-        return numpy.frombuffer(frame_buffer.read(), dtype=numpy.uint8)
+        return numpy.frombuffer(frame_buffer.read(components=4), dtype=numpy.uint8)

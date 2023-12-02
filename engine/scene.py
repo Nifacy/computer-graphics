@@ -130,7 +130,7 @@ def _dump_triangles(triangles: Iterable[types.Triangle]) -> numpy.ndarray:
     dumped_triangles = []
 
     for triangle in triangles:
-        color = [triangle.color.r / 255, triangle.color.g / 255, triangle.color.b / 255]
+        color = [triangle.color.r / 255, triangle.color.g / 255, triangle.color.b / 255, triangle.color.a]
 
         for point, normal in zip(triangle.points, triangle.normals):
             point = list(point)
