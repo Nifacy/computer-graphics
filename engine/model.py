@@ -36,8 +36,8 @@ def load(filepath: str) -> scene.Mesh:
                 _, *data = file.readline().strip().split()
                 materials[alias] = tuple(map(float, data))
 
+        materials = {alias: types.Color(*map(lambda x: int(x * 255), data[:3]), data[3] if len(data) == 4 else 1.0) for alias, data in materials.items()}
 
-        materials = {alias: types.Color(*map(lambda x: int(x * 255), data)) for alias, data in materials.items()}
         vertexes = tuple(starmap(types.Vector3, vertexes))
         normal = _calculate_normal(vertexes)
         faces = [
