@@ -3,6 +3,11 @@ from itertools import starmap
 from . import types, scene
 
 
+def _calculate_normal(edges: tuple[types.Vector3, types.Vector3, types.Vector3]) -> types.Vector3:
+    v, w = edges[1] - edges[0], edges[2] - edges[0]
+    return v.cross(w).normalize()
+
+
 def load(filepath: str) -> scene.Mesh:
     materials = dict()
     vertexes = []
@@ -34,11 +39,11 @@ def load(filepath: str) -> scene.Mesh:
 
         materials = {alias: types.Color(*map(lambda x: int(x * 255), data)) for alias, data in materials.items()}
         vertexes = tuple(starmap(types.Vector3, vertexes))
-        zero_normal = types.Vector3(0.0, 0.0, 0.0)
+        normal = _calculate_normal(vertexes)
         faces = [
             types.Triangle(
                 points=tuple(map(lambda i: vertexes[i - 1 if i >= 0 else i], point_indexes)),
-                normals=(zero_normal, zero_normal, zero_normal),
+                normals=(normal, normal, normal),
                 color=materials.get(material_alias, types.Color(0, 0, 0)),
             )
             for material_alias, point_indexes in faces
