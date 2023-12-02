@@ -128,6 +128,7 @@ class Scene:
 
 def _dump_triangles(triangles: Iterable[types.Triangle]) -> numpy.ndarray:
     dumped_triangles = []
+    transparent_triangles = []
 
     for triangle in triangles:
         color = [triangle.color.r / 255, triangle.color.g / 255, triangle.color.b / 255, triangle.color.a]
@@ -135,9 +136,14 @@ def _dump_triangles(triangles: Iterable[types.Triangle]) -> numpy.ndarray:
         for point, normal in zip(triangle.points, triangle.normals):
             point = list(point)
             normal = list(normal)
-            dumped_triangles.append([*point, *normal, *color, 0.0, triangle.specular])
+            serialized_triangle = [*point, *normal, *color, 0.0, triangle.specular]
 
-    return numpy.concatenate(dumped_triangles, axis=0).astype('f4')
+            if triangle.color.a < 1.0:
+                transparent_triangles.append(serialized_triangle)
+            else:
+                dumped_triangles.append(serialized_triangle)
+
+    return numpy.concatenate(dumped_triangles + transparent_triangles, axis=0).astype('f4')
 
 
 def dump_scene(scene: Scene) -> tuple[numpy.ndarray, tuple[Light, ...]]:

@@ -59,7 +59,7 @@ class Renderer:
             vertex_buffer, template_buffer = template_buffer, vertex_buffer
 
         frame_buffer.use()
-        frame_buffer.clear(1.0, 1.0, 1.0, 1.0)
+        frame_buffer.clear(1.0, 1.0, 1.0, 0.0)
 
         self._shader['viewSize'] = self._config.view_size
         vertex_array = self._context.simple_vertex_array(
@@ -70,9 +70,9 @@ class Renderer:
         if self._config.mode == RenderMode.WIREFRAME:
             self._context.wireframe = True
         
-        # self._context.enable(moderngl.DEPTH_TEST)
+        self._context.enable(moderngl.DEPTH_TEST)
         self._context.enable(moderngl.BLEND)
-        # self._context.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA)
+        self._context.blend_func = (moderngl.SRC_ALPHA, moderngl.ONE_MINUS_SRC_ALPHA)
         vertex_array.render(moderngl.TRIANGLES)
 
         if self._config.mode == RenderMode.WIREFRAME:
